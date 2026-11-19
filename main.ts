@@ -1,40 +1,70 @@
-// Deterministic bundle verifier for gta6-cover-art-01 ("Neon Coast").
-// Node 22+, standard library only, no network. Run: node main.ts
-// Prints a sorted JSON report to stdout; exit 0 when all checks pass.
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = process.cwd();
+type Check = { detail: string; name: string; pass: boolean };
 
-const APP_FILES = [
-  "app/app.js",
-  "app/fonts/Anton-Regular.ttf",
-  "app/fonts/Caveat.ttf",
-  "app/fonts/OFL-Anton.txt",
-  "app/fonts/OFL-Caveat.txt",
+const root: string = path.dirname(fileURLToPath(import.meta.url));
+
+const appFiles: string[] = [
   "app/index.html",
+  "app/app.js",
+  "app/styles.css",
+  "app/fonts/Anton-Regular.ttf",
+  "app/fonts/OFL-Anton.txt",
+  "app/fonts/Caveat.ttf",
+  "app/fonts/OFL-Caveat.txt",
   "app/samples/sample1-hero.jpg",
   "app/samples/sample2-ferris.jpg",
   "app/samples/sample3-heist.jpg",
   "app/samples/sample4-skate.jpg",
-  "app/styles.css",
 ];
 
-const REPO_FILES = [".makefun/owner.json", "LICENSE", "README.md", "main.ts"];
-
-const ALL_FILES = [...APP_FILES, ...REPO_FILES].sort();
-
-const BADGES = [
-  "https://make.fun/badge/gta6-cover-art-01.svg",
-  "https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/rank.svg",
-  "https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/reward.svg",
+const repoFiles: string[] = [
+  "LICENSE",
+  "README.md",
+  ".makefun/owner.json",
+  "main.ts",
 ];
 
-const OFFLINE_PATTERNS = [
+const allFiles: string[] = [...appFiles, ...repoFiles];
+
+function sha256(data: Buffer): string {
+  return createHash("sha256").update(data).digest("hex");
+}
+
+function readText(rel: string): string {
+  return fs.readFileSync(path.join(root, rel), "utf8");
+}
+
+function existsFile(rel: string): boolean {
+  const p: string = path.join(root, rel);
+  try {
+    return fs.statSync(p).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function fileSize(rel: string): number {
+  return fs.statSync(path.join(root, rel)).size;
+}
+
+const checks: Check[] = [];
+
+for (const rel of allFiles) {
+  if (existsFile(rel)) {
+    checks.push({ detail: String(fileSize(rel)), name: "exists:" + rel, pass: true });
+  } else {
+    checks.push({ detail: "missing", name: "exists:" + rel, pass: false });
+  }
+}
+
+const forbidden: string[] = [
   "http://",
   "https://",
-  "eval(",
+  "eval",
   "new Function",
   "serviceWorker",
   "document.cookie",
@@ -43,200 +73,163 @@ const OFFLINE_PATTERNS = [
   "WebSocket",
 ];
 
-const WALLET = "3yBDPgQMqvpj4cH7bAcrzw2Y9JcjsG4MfKAhrgvmMtp3";
+for (const rel of ["app/index.html", "app/app.js", "app/styles.css"]) {
+  if (!existsFile(rel)) {
+    checks.push({ detail: "missing", name: "offline:" + rel, pass: false });
+    continue;
+  }
+  const content: string = readText(rel);
+  const found: string[] = forbidden.filter((pat) => content.includes(pat));
+  checks.push({
+    detail: found.length === 0 ? "no network/eval refs" : found.join(", "),
+    name: "offline:" + rel,
+    pass: found.length === 0,
+  });
+}
 
-const LAYOUT_SNIPPETS = [
+if (existsFile("LICENSE")) {
+  const first: string = readText("LICENSE").split("\n")[0].trim();
+  checks.push({
+    detail: first,
+    name: "license:spdx-first-line",
+    pass: first === "SPDX-License-Identifier: MIT",
+  });
+} else {
+  checks.push({ detail: "missing", name: "license:spdx-first-line", pass: false });
+}
+
+const badges: string[] = [
+  "https://make.fun/badge/gta6-cover-art-01.svg",
+  "https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/rank.svg",
+  "https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/reward.svg",
+];
+
+for (const url of badges) {
+  const badgeName: string = url.split("/").pop() as string;
+  if (!existsFile("README.md")) {
+    checks.push({ detail: "missing README.md", name: "readme:badge:" + badgeName, pass: false });
+    continue;
+  }
+  const readme: string = readText("README.md");
+  checks.push({
+    detail: readme.includes(url) ? url : "absent",
+    name: "readme:badge:" + badgeName,
+    pass: readme.includes(url),
+  });
+}
+
+if (existsFile(".makefun/owner.json")) {
+  let wallet: string = "";
+  let ok: boolean = false;
+  try {
+    const parsed = JSON.parse(readText(".makefun/owner.json")) as { wallet?: unknown };
+    wallet = typeof parsed.wallet === "string" ? parsed.wallet : "";
+    ok = wallet === "3yBDPgQMqvpj4cH7bAcrzw2Y9JcjsG4MfKAhrgvmMtp3";
+  } catch {
+    ok = false;
+  }
+  checks.push({ detail: wallet, name: "owner:wallet", pass: ok });
+} else {
+  checks.push({ detail: "missing", name: "owner:wallet", pass: false });
+}
+
+const sampleFiles: string[] = [
+  "app/samples/sample1-hero.jpg",
+  "app/samples/sample2-ferris.jpg",
+  "app/samples/sample3-heist.jpg",
+  "app/samples/sample4-skate.jpg",
+];
+if (sampleFiles.every((rel) => existsFile(rel))) {
+  const hashes: string[] = sampleFiles.map((rel) =>
+    sha256(fs.readFileSync(path.join(root, rel))),
+  );
+  const distinct: number = new Set(hashes).size;
+  checks.push({
+    detail: String(distinct) + " distinct hashes",
+    name: "samples:four-distinct",
+    pass: distinct === 4,
+  });
+} else {
+  checks.push({ detail: "missing sample", name: "samples:four-distinct", pass: false });
+}
+
+const oflPhrases: string[] = [
+  "SIL OPEN FONT LICENSE",
+  "Version 1.1",
+  "Permission is hereby granted, free of charge",
+];
+for (const name of ["OFL-Anton.txt", "OFL-Caveat.txt"]) {
+  const rel: string = "app/fonts/" + name;
+  if (!existsFile(rel)) {
+    checks.push({ detail: "missing", name: "ofl:" + name, pass: false });
+    continue;
+  }
+  const content: string = readText(rel);
+  const missing: string[] = oflPhrases.filter((phrase) => !content.includes(phrase));
+  checks.push({
+    detail: missing.length === 0 ? "all phrases present" : "missing: " + missing.join(", "),
+    name: "ofl:" + name,
+    pass: missing.length === 0,
+  });
+}
+
+const alfaTtf: boolean = existsFile("app/fonts/AlfaSlabOne-Regular.ttf");
+const alfaOfl: boolean = existsFile("app/fonts/OFL-AlfaSlabOne.txt");
+checks.push({
+  detail: alfaTtf || alfaOfl ? "present" : "absent",
+  name: "fonts:alfa-absent",
+  pass: !alfaTtf && !alfaOfl,
+});
+
+const appTextFiles: string[] = ["app/index.html", "app/app.js", "app/styles.css"];
+if (appTextFiles.every((rel) => existsFile(rel))) {
+  const contents: string[] = appTextFiles.map((rel) => readText(rel));
+  const allAnton: boolean = contents.every((c) => c.includes("Anton"));
+  const anyAlfa: boolean = contents.some((c) => c.includes("Alfa"));
+  checks.push({
+    detail: allAnton && !anyAlfa ? "Anton in all three, no Alfa" : "mismatch",
+    name: "fonts:anton-in-app",
+    pass: allAnton && !anyAlfa,
+  });
+} else {
+  checks.push({ detail: "missing app file", name: "fonts:anton-in-app", pass: false });
+}
+
+const layoutNeedles: Array<[string, string]> = [
   ["layouts:landscape-v1-hero", "w: 1152, h: 1080"],
   ["layouts:portrait-hero-top", "w: 1080, h: 810"],
   ["layouts:square-banner", "w: 1080, h: 594"],
   ["layouts:diagonal-landscape", "slant: 60"],
 ];
-
-function sha256(file) {
-  return createHash("sha256").update(readFileSync(file)).digest("hex");
-}
-
-function readText(rel) {
-  return readFileSync(join(ROOT, rel), "utf8");
-}
-
-function check(name, passed, detail) {
-  return { name, passed, detail };
-}
-
-const checks = [];
-
-// exists (15)
-for (const rel of ALL_FILES) {
-  const full = join(ROOT, rel);
-  let ok = false;
-  let detail = "missing";
-  try {
-    if (existsSync(full) && statSync(full).isFile()) {
-      ok = true;
-      detail = String(statSync(full).size);
-    }
-  } catch {
-    ok = false;
-    detail = "missing";
+if (existsFile("app/app.js")) {
+  const js: string = readText("app/app.js");
+  for (const [name, needle] of layoutNeedles) {
+    checks.push({ detail: needle, name, pass: js.includes(needle) });
   }
-  checks.push(check("exists:" + rel, ok, detail));
-}
-
-// offline (3)
-for (const rel of ["app/index.html", "app/app.js", "app/styles.css"]) {
-  let content = "";
-  try {
-    content = readText(rel);
-  } catch {
-    content = "";
+} else {
+  for (const [name, needle] of layoutNeedles) {
+    checks.push({ detail: needle, name, pass: false });
   }
-  const found = OFFLINE_PATTERNS.filter((p) => content.includes(p));
-  checks.push(
-    check(
-      "offline:" + rel,
-      found.length === 0,
-      found.length === 0 ? "no network/eval refs" : "found: " + found.join(", "),
-    ),
-  );
-}
-
-// license (1)
-let licenseFirst = "";
-try {
-  licenseFirst = readText("LICENSE").split("\n")[0].trim();
-} catch {
-  licenseFirst = "";
-}
-checks.push(
-  check(
-    "license:spdx-first-line",
-    licenseFirst === "SPDX-License-Identifier: MIT",
-    licenseFirst,
-  ),
-);
-
-// readme badges (3)
-let readme = "";
-try {
-  readme = readText("README.md");
-} catch {
-  readme = "";
-}
-for (const url of BADGES) {
-  const badgeName = url.slice(url.lastIndexOf("/") + 1);
-  checks.push(check("readme:badge:" + badgeName, readme.includes(url), url));
-}
-
-// owner (1)
-let ownerOk = false;
-let ownerDetail = "unparsable";
-try {
-  const parsed = JSON.parse(readText(".makefun/owner.json"));
-  ownerOk = parsed && parsed.wallet === WALLET;
-  ownerDetail = ownerOk ? WALLET : "wallet mismatch";
-} catch {
-  ownerOk = false;
-  ownerDetail = "unparsable";
-}
-checks.push(check("owner:wallet", ownerOk, ownerDetail));
-
-// samples (1)
-const sampleHashes = [];
-for (const rel of [
-  "app/samples/sample1-hero.jpg",
-  "app/samples/sample2-ferris.jpg",
-  "app/samples/sample3-heist.jpg",
-  "app/samples/sample4-skate.jpg",
-]) {
-  try {
-    sampleHashes.push(sha256(join(ROOT, rel)));
-  } catch {
-    sampleHashes.push("missing");
-  }
-}
-checks.push(
-  check(
-    "samples:four-distinct",
-    new Set(sampleHashes).size === 4,
-    String(new Set(sampleHashes).size) + " distinct hashes",
-  ),
-);
-
-// ofl (2)
-for (const name of ["OFL-Anton.txt", "OFL-Caveat.txt"]) {
-  let content = "";
-  try {
-    content = readText("app/fonts/" + name);
-  } catch {
-    content = "";
-  }
-  const phrases = [
-    "SIL OPEN FONT LICENSE",
-    "Version 1.1",
-    "Permission is hereby granted, free of charge",
-  ];
-  const missing = phrases.filter((p) => !content.includes(p));
-  checks.push(
-    check(
-      "ofl:" + name,
-      missing.length === 0,
-      missing.length === 0 ? "all phrases present" : "missing: " + missing.join(", "),
-    ),
-  );
-}
-
-// fonts (2)
-const alfaTtf = existsSync(join(ROOT, "app/fonts/AlfaSlabOne-Regular.ttf"));
-const alfaOfl = existsSync(join(ROOT, "app/fonts/OFL-AlfaSlabOne.txt"));
-checks.push(
-  check("fonts:alfa-absent", !alfaTtf && !alfaOfl, alfaTtf || alfaOfl ? "present" : "absent"),
-);
-let antonOk = true;
-for (const rel of ["app/index.html", "app/app.js", "app/styles.css"]) {
-  let content = "";
-  try {
-    content = readText(rel);
-  } catch {
-    content = "";
-  }
-  if (!content.includes("Anton") || content.includes("Alfa")) antonOk = false;
-}
-checks.push(
-  check("fonts:anton-in-app", antonOk, antonOk ? "Anton in all app files" : "check failed"),
-);
-
-// layouts (4)
-let appJs = "";
-try {
-  appJs = readText("app/app.js");
-} catch {
-  appJs = "";
-}
-for (const [name, snippet] of LAYOUT_SNIPPETS) {
-  checks.push(check(name, appJs.includes(snippet), snippet));
 }
 
 checks.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 
-const files = {};
-for (const rel of ALL_FILES) {
-  try {
-    files[rel] = sha256(join(ROOT, rel));
-  } catch {
-    // absent files are left out of the map
+const files: Record<string, string> = {};
+for (const rel of [...allFiles].sort()) {
+  if (existsFile(rel)) {
+    files[rel] = sha256(fs.readFileSync(path.join(root, rel)));
   }
 }
 
-const passed = checks.filter((c) => c.passed).length;
+const passed: number = checks.filter((c) => c.pass).length;
 const report = {
   bundle: "gta6-cover-art-01",
-  entry: "Neon Coast final (per-orientation layouts, Anton)",
   checks,
+  entry: "Neon Coast final (per-orientation layouts, Anton)",
   files,
   passed,
   total: checks.length,
 };
 
-process.stdout.write(JSON.stringify(report, null, 2) + "\n");
-process.exit(passed === checks.length ? 0 : 1);
+console.log(JSON.stringify(report, null, 2));
+process.exitCode = passed === checks.length ? 0 : 1;

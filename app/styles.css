@@ -125,6 +125,12 @@ body {
   display: block;
 }
 
+.slot-cap {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0 0 8px;
+}
+
 .slot input[type="file"] {
   width: 100%;
   font-size: 12px;
@@ -258,11 +264,11 @@ body.scene-cover {
 
 body.scene-cover .topbar,
 body.scene-cover .panel-col,
+body.scene-cover .stage-col h2,
 body.scene-cover .stage-toolbar,
 body.scene-cover .stage-note,
 body.scene-cover .text-col,
-body.scene-cover .foot,
-body.scene-cover .stage-col h2 {
+body.scene-cover .foot {
   display: none;
 }
 
