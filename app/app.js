@@ -1,7 +1,8 @@
 // app.js — Neon Coast cover maker (gta6-cover-art-01, final).
 // Static, offline, no network. Canvas cover renderer with three
-// aspect-specific layouts (V1 hero-dominant landscape, V3 diagonal
-// portrait, banner square), four photo slots, per-panel crop/zoom/tilt.
+// aspect-specific layouts (V1 hero-dominant landscape, hero-top
+// portrait, banner square) plus a V3 diagonal landscape render
+// (?layout=diagonal), four photo slots, per-panel crop/zoom/tilt.
 // The cover is full-bleed photos plus the title only, set in Anton.
 "use strict";
 
@@ -27,12 +28,15 @@ const SAMPLES = [
 // One layout per aspect, all FULL-BLEED: the panels tile the whole cover
 // edge to edge, no margin, no gutter, no border, square corners. Each
 // aspect gets its own composition — landscape is the V1 hero-dominant
-// cover, portrait is four diagonal strips (V3), square is a full-width
-// boulevard banner on top with three panels below. No per-panel names
-// are drawn anywhere; the only text on the cover is the title, overlaid
-// with a dark scrim behind it. Each rect carries its own fy/zoom (and
-// fx) defaults so the baked-in poster texts stay out of frame at every
-// aspect; the user's zoom slider multiplies the layout zoom.
+// cover, portrait is the hero on top with three panels below, square is
+// a full-width boulevard banner on top with three panels below. The V3
+// diagonal strips live in diagonalLayout() as a separate landscape
+// screenshot render (?layout=diagonal), not an export size. No
+// per-panel names are drawn anywhere; the only text on the cover is the
+// title, overlaid with a dark scrim behind it. Each rect carries its own
+// fy/zoom (and fx) defaults so the baked-in poster texts stay out of
+// frame at every aspect; the user's zoom slider multiplies the layout
+// zoom.
 // strip is the invisible swap handle: dragging a panel by its bottom
 // edge swaps it with another panel (no label bar is drawn).
 // A rect with slant is a diagonal strip: its clip is the parallelogram
@@ -41,18 +45,16 @@ const SAMPLES = [
 function layoutFor(sizeKey) {
   if (sizeKey === "portrait") {
     return {
-      // Diagonal strips (V3): four full-height strips side by side,
-      // boulevard / ferris / heist / skate, leaning right at the top.
-      // The outer corners leave sunset-gradient wedges, as in V3.
+      // Hero on top (60% of the height), three panels in a row below.
       title: { x: 36, y: 112, size: 84, scrim: 230 },
       rects: [
-        { x: 0, y: 0, w: 270, h: 1350, fy: 0.50, zoom: 1.6, slant: 75 },
-        { x: 270, y: 0, w: 270, h: 1350, fy: 0.58, zoom: 1.6, slant: 75 },
-        { x: 540, y: 0, w: 270, h: 1350, fy: 0.56, zoom: 1.4, slant: 75 },
+        { x: 0, y: 0, w: 1080, h: 810, fy: 0.55, zoom: 1.1 },
+        { x: 0, y: 810, w: 360, h: 540, fy: 0.58, zoom: 1.5 },
+        { x: 360, y: 810, w: 360, h: 540, fy: 0.58, zoom: 1.5 },
         // The skate poster's baked-in title ("CRUISE / WELCOME TO NEON
-        // BAY") sits at ~12-33% height, so this strip zooms tighter
-        // and shifts right (fx 0.62) to keep it out and the face in.
-        { x: 810, y: 0, w: 270, h: 1350, fy: 0.62, fx: 0.62, zoom: 1.8, slant: 75 },
+        // BAY") sits at ~12-33% height, so this panel zooms tighter
+        // (window 0.34-0.90) to keep it out while the face stays in.
+        { x: 720, y: 810, w: 360, h: 540, fy: 0.62, zoom: 1.8 },
       ],
       strip: 40,
     };
@@ -85,9 +87,42 @@ function layoutFor(sizeKey) {
   };
 }
 
+// The diagonal cover (V3): four full-height slanted strips side by
+// side at LANDSCAPE size, boulevard / ferris / heist / skate, leaning
+// right at the top, with sunset-gradient wedges in the outer corners.
+// This is a screenshot render, not an export size: it is only drawn
+// when the page is opened with ?layout=diagonal. Geometry and crops
+// are exactly the V3 variant's (sw 480, slant 60); the title is the
+// app's landscape title in Anton.
+function diagonalLayout() {
+  return {
+    title: { x: 48, y: 155, size: 140, scrim: 340 },
+    rects: [
+      { x: 0, y: 0, w: 480, h: 1080, fy: 0.50, zoom: 1.6, slant: 60 },
+      { x: 480, y: 0, w: 480, h: 1080, fy: 0.60, zoom: 1.5, slant: 60 },
+      { x: 960, y: 0, w: 480, h: 1080, fy: 0.58, zoom: 1.5, slant: 60 },
+      { x: 1440, y: 0, w: 480, h: 1080, fy: 0.62, zoom: 1.55, slant: 60 },
+    ],
+    strip: 46,
+  };
+}
+
+// The layout actually drawn for a size: the diagonal render when the
+// page asked for it at landscape, otherwise the standard per-aspect
+// layout. Exports from the editor always use the standard layouts.
+function layoutToDraw(sizeKey) {
+  if (sizeKey === state.size && state.layoutOverride === "diagonal") {
+    return diagonalLayout();
+  }
+  return layoutFor(sizeKey);
+}
+
 const state = {
   size: "landscape",
   title: "NEON COAST",
+  // "diagonal" renders the V3 diagonal strips instead of the standard
+  // landscape layout; set only from the ?layout=diagonal query param.
+  layoutOverride: null,
   panels: SAMPLES.map((s) => ({
     label: s.label, cap: s.cap, file: s.file,
     img: null, loaded: false,
@@ -219,7 +254,7 @@ function drawPanel(ctx, p, rect) {
 
 function drawCover(ctx, sizeKey) {
   const size = SIZES[sizeKey];
-  const L = layoutFor(sizeKey);
+  const L = layoutToDraw(sizeKey);
   const W = size.w;
   const H = size.h;
 
@@ -356,7 +391,7 @@ function canvasPoint(evt) {
 }
 
 function hitPanel(pt) {
-  const L = layoutFor(state.size);
+  const L = layoutToDraw(state.size);
   for (let i = 0; i < 4; i++) {
     const rc = L.rects[i];
     if (pt.y < rc.y || pt.y > rc.y + rc.h) continue;
@@ -464,6 +499,8 @@ function bindControls() {
 window.__cover = {
   state,
   layoutFor,
+  diagonalLayout,
+  layoutToDraw,
   exportPNG,
   renderPreview,
   async setPanelImage(index, dataUrl) {
@@ -480,7 +517,7 @@ window.__cover = {
     off.height = size.h;
     const ctx = off.getContext("2d");
     drawCover(ctx, sizeKey);
-    const L = layoutFor(sizeKey);
+    const L = layoutToDraw(sizeKey);
     return L.rects.map((rc) => {
       const d = ctx.getImageData(
         Math.floor(rc.x + rc.w / 2), Math.floor(rc.y + rc.h / 2 - 10), 1, 1).data;
@@ -494,6 +531,7 @@ async function init() {
   const scene = params.get("scene") || "editor";
   const sizeParam = params.get("size");
   if (sizeParam && SIZES[sizeParam]) state.size = sizeParam;
+  if (params.get("layout") === "diagonal") state.layoutOverride = "diagonal";
   if (scene === "cover") document.body.classList.add("scene-cover");
   await loadSamples();
   await ensureFonts();

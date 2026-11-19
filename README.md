@@ -26,14 +26,16 @@ its bottom edge (the handle is invisible, so the cover stays clean).
 - **Landscape 1920×1080 — V1 hero-dominant:** one big boulevard panel on
   the left (60% of the width, full height) with the other three panels
   stacked on the right.
-- **Portrait 1080×1350 — V3 diagonal:** four full-height slanted strips
-  side by side (boulevard / ferris / heist / skate), leaning right at the
-  top, with sunset-gradient wedges in the outer corners.
+- **Portrait 1080×1350 — hero on top:** one big boulevard panel on top
+  (60% of the height) with the other three panels in a row below.
 - **Square 1080×1080 — banner:** the boulevard hero spans the full width
   on top (55% of the height), with the other three panels in a row below.
 
-V3 diagonal and V10 banner-bottom are kept as backup layouts in `variants/`
-(uncommitted).
+A fourth render, the **V3 diagonal** (four full-height slanted strips side
+by side at landscape size, leaning right at the top, with sunset-gradient
+wedges in the outer corners), is available on the cover page with
+`?layout=diagonal` and is captured as screenshot 03 — it is not an export
+size; the app still exports the three standard sizes above.
 
 ## V4 — what changed from V3
 
@@ -70,8 +72,9 @@ node main.ts
 present, no network/eval references in the app, SPDX license line, the three
 README badges, the owner wallet, four distinct samples, the OFL license
 texts, the font swap (Anton present and referenced, Alfa Slab One fully
-gone), and the three per-orientation layouts (V1 hero landscape, diagonal
-portrait, banner square) — then prints a deterministic JSON report. Run it twice: the output is
+gone), and the three per-orientation layouts (V1 hero landscape, hero-top
+portrait, banner square) plus the diagonal landscape render — then prints a
+deterministic JSON report. Run it twice: the output is
 byte-identical.
 
 ## Files

@@ -151,13 +151,15 @@ function checkOfl(checks: Check[]): void {
 }
 
 function checkLayouts(checks: Check[]): void {
-  // The three per-orientation compositions must be the ones in the app:
-  // V1 hero-dominant landscape, V3 diagonal portrait, banner square.
+  // The three per-orientation compositions plus the diagonal landscape
+  // render must be the ones in the app: V1 hero-dominant landscape,
+  // hero-on-top portrait, banner square, V3 diagonal landscape.
   const src = readText(join(ROOT, "app/app.js"));
   const cases: Array<[string, string, string]> = [
     ["layouts:landscape-v1-hero", "w: 1152, h: 1080", "landscape hero rect missing"],
-    ["layouts:portrait-diagonal", "slant: 75", "portrait diagonal strips missing"],
+    ["layouts:portrait-hero-top", "w: 1080, h: 810", "portrait hero rect missing"],
     ["layouts:square-banner", "w: 1080, h: 594", "square banner hero missing"],
+    ["layouts:diagonal-landscape", "slant: 60", "diagonal landscape strips missing"],
   ];
   for (const [name, needle, detail] of cases) {
     const ok = src.includes(needle);
