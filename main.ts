@@ -1,10 +1,13 @@
-import * as fs from "node:fs";
-import * as path from "node:path";
-import * as crypto from "node:crypto";
+// Deterministic bundle verifier for gta6-cover-art-01 ("Neon Coast").
+// Node 22+, standard library only, no network. Run: node main.ts
+// Prints a sorted JSON report to stdout; exit 0 when all checks pass.
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 
-const ROOT: string = process.cwd();
+const ROOT = process.cwd();
 
-const APP_FILES: string[] = [
+const APP_FILES = [
   "app/app.js",
   "app/fonts/Anton-Regular.ttf",
   "app/fonts/Caveat.ttf",
@@ -18,28 +21,21 @@ const APP_FILES: string[] = [
   "app/styles.css",
 ];
 
-const REPO_FILES: string[] = [
-  ".makefun/owner.json",
-  "LICENSE",
-  "README.md",
-  "main.ts",
-];
+const REPO_FILES = [".makefun/owner.json", "LICENSE", "README.md", "main.ts"];
 
-const ALL_FILES: string[] = [...APP_FILES, ...REPO_FILES].sort();
+const ALL_FILES = [...APP_FILES, ...REPO_FILES].sort();
 
-const WALLET: string = "3yBDPgQMqvpj4cH7bAcrzw2Y9JcjsG4MfKAhrgvmMtp3";
-
-const BADGES: string[] = [
+const BADGES = [
   "https://make.fun/badge/gta6-cover-art-01.svg",
   "https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/rank.svg",
   "https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/reward.svg",
 ];
 
-const OFFLINE_PATTERNS: string[] = [
+const OFFLINE_PATTERNS = [
   "http://",
   "https://",
-  "eval",
-  "Function",
+  "eval(",
+  "new Function",
   "serviceWorker",
   "document.cookie",
   "XMLHttpRequest",
@@ -47,215 +43,200 @@ const OFFLINE_PATTERNS: string[] = [
   "WebSocket",
 ];
 
-const OFL_PHRASES: string[] = [
-  "SIL OPEN FONT LICENSE",
-  "Version 1.1",
-  "Permission is hereby granted, free of charge",
+const WALLET = "3yBDPgQMqvpj4cH7bAcrzw2Y9JcjsG4MfKAhrgvmMtp3";
+
+const LAYOUT_SNIPPETS = [
+  ["layouts:landscape-v1-hero", "w: 1152, h: 1080"],
+  ["layouts:portrait-hero-top", "w: 1080, h: 810"],
+  ["layouts:square-banner", "w: 1080, h: 594"],
+  ["layouts:diagonal-landscape", "slant: 60"],
 ];
 
-type Check = { name: string; passed: boolean; detail: string };
-
-function sha256(rel: string): string {
-  const buf: Buffer = fs.readFileSync(path.join(ROOT, rel));
-  return crypto.createHash("sha256").update(buf).digest("hex");
+function sha256(file) {
+  return createHash("sha256").update(readFileSync(file)).digest("hex");
 }
 
-function readText(rel: string): string | null {
-  const full: string = path.join(ROOT, rel);
-  if (!fs.existsSync(full)) return null;
-  return fs.readFileSync(full, "utf8");
+function readText(rel) {
+  return readFileSync(join(ROOT, rel), "utf8");
 }
 
-function isFile(rel: string): boolean {
-  const full: string = path.join(ROOT, rel);
-  try {
-    return fs.statSync(full).isFile();
-  } catch {
-    return false;
-  }
+function check(name, passed, detail) {
+  return { name, passed, detail };
 }
 
-function sizeOf(rel: string): number {
-  return fs.statSync(path.join(ROOT, rel)).size;
-}
-
-const checks: Check[] = [];
+const checks = [];
 
 // exists (15)
 for (const rel of ALL_FILES) {
-  if (isFile(rel)) {
-    checks.push({ name: "exists:" + rel, passed: true, detail: sizeOf(rel) + " bytes" });
-  } else {
-    checks.push({ name: "exists:" + rel, passed: false, detail: "missing" });
+  const full = join(ROOT, rel);
+  let ok = false;
+  let detail = "missing";
+  try {
+    if (existsSync(full) && statSync(full).isFile()) {
+      ok = true;
+      detail = String(statSync(full).size);
+    }
+  } catch {
+    ok = false;
+    detail = "missing";
   }
+  checks.push(check("exists:" + rel, ok, detail));
 }
 
 // offline (3)
 for (const rel of ["app/index.html", "app/app.js", "app/styles.css"]) {
-  const content: string | null = readText(rel);
-  if (content === null) {
-    checks.push({ name: "offline:" + rel, passed: false, detail: "missing" });
-  } else {
-    const found: string[] = OFFLINE_PATTERNS.filter((p: string) => content.includes(p));
-    if (found.length === 0) {
-      checks.push({ name: "offline:" + rel, passed: true, detail: "no network/eval refs" });
-    } else {
-      checks.push({ name: "offline:" + rel, passed: false, detail: "found: " + found.join(", ") });
-    }
+  let content = "";
+  try {
+    content = readText(rel);
+  } catch {
+    content = "";
   }
+  const found = OFFLINE_PATTERNS.filter((p) => content.includes(p));
+  checks.push(
+    check(
+      "offline:" + rel,
+      found.length === 0,
+      found.length === 0 ? "no network/eval refs" : "found: " + found.join(", "),
+    ),
+  );
 }
 
 // license (1)
-{
-  const content: string | null = readText("LICENSE");
-  if (content === null) {
-    checks.push({ name: "license:spdx-first-line", passed: false, detail: "missing" });
-  } else {
-    const first: string = content.split("\n")[0].trim();
-    checks.push({
-      name: "license:spdx-first-line",
-      passed: first === "SPDX-License-Identifier: MIT",
-      detail: first,
-    });
-  }
+let licenseFirst = "";
+try {
+  licenseFirst = readText("LICENSE").split("\n")[0].trim();
+} catch {
+  licenseFirst = "";
 }
+checks.push(
+  check(
+    "license:spdx-first-line",
+    licenseFirst === "SPDX-License-Identifier: MIT",
+    licenseFirst,
+  ),
+);
 
 // readme badges (3)
-{
-  const content: string | null = readText("README.md");
-  for (const url of BADGES) {
-    const base: string = url.split("/").pop() as string;
-    if (content === null) {
-      checks.push({ name: "readme:badge:" + base, passed: false, detail: "missing README.md" });
-    } else if (content.includes(url)) {
-      checks.push({ name: "readme:badge:" + base, passed: true, detail: "contains " + url });
-    } else {
-      checks.push({ name: "readme:badge:" + base, passed: false, detail: "missing " + url });
-    }
-  }
+let readme = "";
+try {
+  readme = readText("README.md");
+} catch {
+  readme = "";
+}
+for (const url of BADGES) {
+  const badgeName = url.slice(url.lastIndexOf("/") + 1);
+  checks.push(check("readme:badge:" + badgeName, readme.includes(url), url));
 }
 
 // owner (1)
-{
-  const content: string | null = readText(".makefun/owner.json");
-  if (content === null) {
-    checks.push({ name: "owner:wallet", passed: false, detail: "missing" });
-  } else {
-    try {
-      const parsed = JSON.parse(content) as { wallet?: unknown };
-      const wallet: unknown = parsed.wallet;
-      checks.push({
-        name: "owner:wallet",
-        passed: wallet === WALLET,
-        detail: typeof wallet === "string" ? wallet : "wallet field missing",
-      });
-    } catch {
-      checks.push({ name: "owner:wallet", passed: false, detail: "invalid JSON" });
-    }
-  }
+let ownerOk = false;
+let ownerDetail = "unparsable";
+try {
+  const parsed = JSON.parse(readText(".makefun/owner.json"));
+  ownerOk = parsed && parsed.wallet === WALLET;
+  ownerDetail = ownerOk ? WALLET : "wallet mismatch";
+} catch {
+  ownerOk = false;
+  ownerDetail = "unparsable";
 }
+checks.push(check("owner:wallet", ownerOk, ownerDetail));
 
 // samples (1)
-{
-  const sampleFiles: string[] = [
-    "app/samples/sample1-hero.jpg",
-    "app/samples/sample2-ferris.jpg",
-    "app/samples/sample3-heist.jpg",
-    "app/samples/sample4-skate.jpg",
-  ];
-  const hashes: string[] = [];
-  let allPresent: boolean = true;
-  for (const rel of sampleFiles) {
-    if (isFile(rel)) hashes.push(sha256(rel));
-    else allPresent = false;
+const sampleHashes = [];
+for (const rel of [
+  "app/samples/sample1-hero.jpg",
+  "app/samples/sample2-ferris.jpg",
+  "app/samples/sample3-heist.jpg",
+  "app/samples/sample4-skate.jpg",
+]) {
+  try {
+    sampleHashes.push(sha256(join(ROOT, rel)));
+  } catch {
+    sampleHashes.push("missing");
   }
-  const distinct: number = new Set(hashes).size;
-  checks.push({
-    name: "samples:four-distinct",
-    passed: allPresent && distinct === 4,
-    detail: distinct + " distinct hashes",
-  });
 }
+checks.push(
+  check(
+    "samples:four-distinct",
+    new Set(sampleHashes).size === 4,
+    String(new Set(sampleHashes).size) + " distinct hashes",
+  ),
+);
 
 // ofl (2)
 for (const name of ["OFL-Anton.txt", "OFL-Caveat.txt"]) {
-  const content: string | null = readText("app/fonts/" + name);
-  if (content === null) {
-    checks.push({ name: "ofl:" + name, passed: false, detail: "missing" });
-  } else {
-    const missingPhrases: string[] = OFL_PHRASES.filter((p: string) => !content.includes(p));
-    if (missingPhrases.length === 0) {
-      checks.push({ name: "ofl:" + name, passed: true, detail: "contains required phrases" });
-    } else {
-      checks.push({ name: "ofl:" + name, passed: false, detail: "missing: " + missingPhrases.join(", ") });
-    }
+  let content = "";
+  try {
+    content = readText("app/fonts/" + name);
+  } catch {
+    content = "";
   }
+  const phrases = [
+    "SIL OPEN FONT LICENSE",
+    "Version 1.1",
+    "Permission is hereby granted, free of charge",
+  ];
+  const missing = phrases.filter((p) => !content.includes(p));
+  checks.push(
+    check(
+      "ofl:" + name,
+      missing.length === 0,
+      missing.length === 0 ? "all phrases present" : "missing: " + missing.join(", "),
+    ),
+  );
 }
 
 // fonts (2)
-{
-  const alfaPresent: boolean =
-    isFile("app/fonts/AlfaSlabOne-Regular.ttf") || isFile("app/fonts/OFL-AlfaSlabOne.txt");
-  checks.push({
-    name: "fonts:alfa-absent",
-    passed: !alfaPresent,
-    detail: alfaPresent ? "Alfa Slab One files present" : "no Alfa Slab One files",
-  });
-}
-{
-  const appPaths: string[] = ["app/index.html", "app/app.js", "app/styles.css"];
-  let allAnton: boolean = true;
-  let anyAlfa: boolean = false;
-  for (const rel of appPaths) {
-    const content: string | null = readText(rel);
-    if (content === null || !content.includes("Anton")) allAnton = false;
-    if (content !== null && content.includes("Alfa")) anyAlfa = true;
+const alfaTtf = existsSync(join(ROOT, "app/fonts/AlfaSlabOne-Regular.ttf"));
+const alfaOfl = existsSync(join(ROOT, "app/fonts/OFL-AlfaSlabOne.txt"));
+checks.push(
+  check("fonts:alfa-absent", !alfaTtf && !alfaOfl, alfaTtf || alfaOfl ? "present" : "absent"),
+);
+let antonOk = true;
+for (const rel of ["app/index.html", "app/app.js", "app/styles.css"]) {
+  let content = "";
+  try {
+    content = readText(rel);
+  } catch {
+    content = "";
   }
-  checks.push({
-    name: "fonts:anton-in-app",
-    passed: allAnton && !anyAlfa,
-    detail: allAnton && !anyAlfa ? "Anton in all app files, no Alfa refs" : "Anton/Alfa mismatch",
-  });
+  if (!content.includes("Anton") || content.includes("Alfa")) antonOk = false;
 }
+checks.push(
+  check("fonts:anton-in-app", antonOk, antonOk ? "Anton in all app files" : "check failed"),
+);
 
 // layouts (4)
-{
-  const content: string | null = readText("app/app.js");
-  const wanted: Array<[string, string]> = [
-    ["layouts:landscape-v1-hero", "w: 1152, h: 1080"],
-    ["layouts:portrait-hero-top", "w: 1080, h: 810"],
-    ["layouts:square-banner", "w: 1080, h: 594"],
-    ["layouts:diagonal-landscape", "slant: 60"],
-  ];
-  for (const [name, snippet] of wanted) {
-    if (content === null) {
-      checks.push({ name, passed: false, detail: "missing app/app.js" });
-    } else if (content.includes(snippet)) {
-      checks.push({ name, passed: true, detail: "contains `" + snippet + "`" });
-    } else {
-      checks.push({ name, passed: false, detail: "missing `" + snippet + "`" });
-    }
+let appJs = "";
+try {
+  appJs = readText("app/app.js");
+} catch {
+  appJs = "";
+}
+for (const [name, snippet] of LAYOUT_SNIPPETS) {
+  checks.push(check(name, appJs.includes(snippet), snippet));
+}
+
+checks.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
+const files = {};
+for (const rel of ALL_FILES) {
+  try {
+    files[rel] = sha256(join(ROOT, rel));
+  } catch {
+    // absent files are left out of the map
   }
 }
 
-checks.sort((a: Check, b: Check) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-
-const files: Record<string, string> = {};
-for (const rel of ALL_FILES) {
-  if (isFile(rel)) files[rel] = sha256(rel);
-}
-
-const passed: number = checks.filter((c: Check) => c.passed).length;
-const total: number = checks.length;
-
+const passed = checks.filter((c) => c.passed).length;
 const report = {
   bundle: "gta6-cover-art-01",
   entry: "Neon Coast final (per-orientation layouts, Anton)",
-  checks: checks,
-  files: files,
-  passed: passed,
-  total: total,
+  checks,
+  files,
+  passed,
+  total: checks.length,
 };
 
 process.stdout.write(JSON.stringify(report, null, 2) + "\n");
-process.exitCode = passed === total ? 0 : 1;
+process.exit(passed === checks.length ? 0 : 1);

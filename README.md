@@ -1,56 +1,67 @@
 # NEON COAST — GTA-style Cover Maker
 
-[![GTA 6 Cover Art](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/)
-[![Rank](https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/rank.svg)](https://make.fun/)
-[![Reward](https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/reward.svg)](https://make.fun/)
+[![Neon Coast — gta6-cover-art-01](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/)
+[![Neon Coast rank](https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/rank.svg)](https://make.fun/)
+[![Neon Coast reward](https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/reward.svg)](https://make.fun/)
 
-A static, fully offline GTA-style cover maker for the `gta6-cover-art-01`
-competition. Four illustrated photo panels plus one title — "NEON COAST" —
-composed full-bleed into a coastal-city night cover, with three export sizes
-and one extra diagonal landscape render.
+A static, fully offline cover maker for the **gta6-cover-art-01** competition.
+Build a GTA-style cover for a fictional coastal city: four illustrated photo
+panels and one big title, **NEON COAST**, set in Anton.
 
-## How it works
+## What it makes
 
-Open `app/index.html` in a browser. No server, no network, no build step.
+- **Landscape 1920 × 1080** — hero-dominant: the boulevard chase fills the
+  left 60%, with the boardwalk, heist standoff, and night skate stacked on
+  the right.
+- **Portrait 1080 × 1350** — hero on top, three panels in a row below.
+- **Square 1080 × 1080** — banner layout: the boulevard fills the top 55%,
+  three panels below.
+- **Diagonal landscape** — a separate render (`?layout=diagonal`): four
+  slanted full-height strips, each 480 wide with a 60 slant.
 
-- **Snapshots (left):** four photo slots. Each snapshot fills its own panel:
-  1 fills panel 1, 2 fills panel 2, 3 fills panel 3, 4 fills panel 4. Upload
-  your own photo per slot, tilt it (-1.5°, 0°, +1.5°), zoom it with the
-  slider, or reset its crop.
-- **Cover preview (right):** pick a size — Landscape 1920 × 1080, Portrait
-  1080 × 1350, or Square 1080 × 1080 — and edit the cover title. Drag
-  inside a photo to pan its crop, scroll over a photo to zoom it, drag a
-  panel by its bottom edge to swap panels.
-- **Export:** "Export PNG (this size)" saves the active size;
-  "Export all 3 sizes" saves all three, one after another.
+Every layout is full-bleed: panels cover the cover edge to edge, no margins,
+no gutters, no borders. The only text on the cover is the title, over a dark
+scrim. The four scenes are a neon boulevard getaway, a ferris wheel over the
+pier at sunset, a heist standoff against the police, and a skateboard under
+neon lights.
 
-## Layouts
+## Using the editor
 
-Every layout is full-bleed: panels cover the whole cover edge to edge, with
-no margins, gutters, or borders. The only text on the cover is the title,
-set in Anton over a dark scrim.
+Open `app/index.html` in a browser (no server and no network needed).
 
-- **Landscape:** hero-dominant — one large hero panel on the left, three
-  stacked panels on the right.
-- **Portrait:** hero on top, three panels in a row below.
-- **Square:** wide hero banner on top, three panels in a row below.
-- **Diagonal landscape:** a separate render (`?layout=diagonal`) — four
-  slanted full-height strips. The editor always exports the standard
-  layouts.
+- Pick a size: Landscape, Portrait, or Square.
+- Each Snapshot card fills its own panel. Upload a photo to replace a panel,
+  drag inside the photo to pan its crop, scroll over it to zoom, and use the
+  tilt buttons to rotate it. "Reset crop" restores the defaults.
+- Drag a panel by its bottom edge onto another panel to swap the two.
+- Edit the cover title; it is always rendered in Anton.
+- "Export PNG (this size)" downloads the current size; "Export all 3 sizes"
+  downloads all three, one after another.
+
+Scene-only views for screenshots: add `?scene=cover` to hide the editor UI
+and show just the cover, and `?layout=diagonal` for the diagonal render.
 
 ## Verification
 
-Run the deterministic verifier from the repo root:
+`main.ts` is a deterministic verifier (Node 22+, standard library only, no
+network). From the repo root, run:
 
 ```sh
 node main.ts
 ```
 
-It runs 32 checks (files exist, offline, license, badges, owner wallet,
-distinct samples, font licenses, Anton-only fonts, layout snippets) and
-prints a sorted JSON report. Exit 0 means 32/32 passed.
+It runs 32 checks — all files present, no network or dynamic-code references
+in the app files, the MIT SPDX first line, the three badges above, the owner
+wallet, four distinct sample images, both font licences, the Anton-only font
+rule, and the four layout markers — and prints a sorted JSON report. It exits
+0 only when all 32 pass, and running it twice gives byte-identical output.
 
 ## Fonts
 
-Display font Anton under the SIL Open Font License 1.1 (see `app/fonts/`).
-Original lettering and art direction. No official logos or artwork.
+Display font **Anton** and handwriting font **Caveat**, both under the SIL
+Open Font License 1.1 (licence texts in `app/fonts/`). No other display font
+is used or bundled.
+
+## Licence
+
+MIT — see `LICENSE`.

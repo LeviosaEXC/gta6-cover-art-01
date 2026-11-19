@@ -33,7 +33,7 @@
 
 body {
   margin: 0;
-  background: linear-gradient(var(--bg) 0%, #1a0b33 60%, #200b2e 100%);
+  background: linear-gradient(180deg, var(--bg) 0%, #1a0b33 60%, #200b2e 100%);
   color: var(--ink);
   font-family: "Trebuchet MS", "Segoe UI", Arial, sans-serif;
 }
@@ -79,8 +79,7 @@ body {
   align-items: start;
 }
 
-.panel-col h2,
-.stage-col h2 {
+.layout h2 {
   margin: 0 0 8px;
   font-size: 18px;
   letter-spacing: 1px;
@@ -262,7 +261,8 @@ body.scene-cover .panel-col,
 body.scene-cover .stage-toolbar,
 body.scene-cover .stage-note,
 body.scene-cover .text-col,
-body.scene-cover .foot {
+body.scene-cover .foot,
+body.scene-cover .stage-col h2 {
   display: none;
 }
 
