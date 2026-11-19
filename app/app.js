@@ -141,10 +141,27 @@ function clipRect(c, rect) {
   c.beginPath();
   if (rect.slant) {
     var s = rect.slant;
-    c.moveTo(rect.x + s, rect.y);
-    c.lineTo(rect.x + rect.w + s, rect.y);
-    c.lineTo(rect.x + rect.w - s, rect.y + rect.h);
-    c.lineTo(rect.x - s, rect.y + rect.h);
+    var w = c.canvas.width;
+    var tlX = rect.x + s;
+    var trX = rect.x + rect.w + s;
+    var brX = rect.x + rect.w - s;
+    var blX = rect.x - s;
+    // The outer strips run off the canvas at one corner each: strip 1
+    // runs off the left edge at the bottom, so its top-left corner
+    // triangle would stay uncovered; strip 4 runs off the right edge
+    // at the top, so its bottom-right corner triangle would stay
+    // uncovered. Extend the outer strip's outer edge to the canvas
+    // edge so the four strips tile the whole canvas with no corner
+    // of background showing. Inner strips are unchanged.
+    if (blX < 0) tlX = 0;
+    if (trX > w) {
+      trX = w;
+      brX = w;
+    }
+    c.moveTo(tlX, rect.y);
+    c.lineTo(trX, rect.y);
+    c.lineTo(brX, rect.y + rect.h);
+    c.lineTo(blX, rect.y + rect.h);
     c.closePath();
   } else {
     c.rect(rect.x, rect.y, rect.w, rect.h);
@@ -155,16 +172,41 @@ function clipRect(c, rect) {
 function drawPanel(c, panel, rect) {
   c.save();
   clipRect(c, rect);
+  var cx = rect.x + rect.w / 2;
+  var cy = rect.y + rect.h / 2;
+  var drawW = rect.w;
+  var drawH = rect.h;
+  var effRect = rect;
+  if (rect.slant) {
+    // A slanted panel is a parallelogram, not an axis-aligned rectangle:
+    // its bounding box is 2 * slant wider than the strip, so an image
+    // drawn at strip width leaves uncovered triangles at the top-right
+    // and bottom-left corners, where the page background shows through.
+    // Draw the image over the full bounding box (plus a small margin,
+    // so a tilted panel still covers the top and bottom edges) and let
+    // the parallelogram clip shape it. The crop is recomputed against
+    // the expanded size, so the image is not stretched.
+    drawW = rect.w + 2 * rect.slant + 16;
+    drawH = rect.h + 32;
+    effRect = {
+      panel: rect.panel,
+      x: rect.x,
+      y: rect.y,
+      w: drawW,
+      h: drawH,
+      fy: rect.fy,
+      fx: rect.fx,
+      zoom: rect.zoom,
+    };
+  }
   if (panel.loaded && panel.img) {
-    var win = cropWindow(panel, rect, panel.img);
-    var cx = rect.x + rect.w / 2;
-    var cy = rect.y + rect.h / 2;
+    var win = cropWindow(panel, effRect, panel.img);
     c.translate(cx, cy);
     if (panel.tilt !== 0) c.rotate((panel.tilt * Math.PI) / 180);
-    c.drawImage(panel.img, win.sx, win.sy, win.dw, win.dh, -rect.w / 2, -rect.h / 2, rect.w, rect.h);
+    c.drawImage(panel.img, win.sx, win.sy, win.dw, win.dh, -drawW / 2, -drawH / 2, drawW, drawH);
   } else {
     c.fillStyle = FALLBACK_FILL;
-    c.fillRect(rect.x, rect.y, rect.w, rect.h);
+    c.fillRect(cx - drawW / 2, cy - drawH / 2, drawW, drawH);
   }
   c.restore();
 }
