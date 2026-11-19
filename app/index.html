@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon Coast Collage — GTA-style cover maker</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<main class="app" id="app">
+  <section class="controls" id="controls">
+    <h1>Neon Coast Collage</h1>
+    <p class="tag">No grid. Four tilted snapshots on a neon coast, taped and pinned by hand. Drag them anywhere, scroll to tilt.</p>
+
+    <fieldset>
+      <legend>Snapshots — drag a card to move it, scroll to zoom its photo</legend>
+      <label class="file">Snapshot 1 <input id="photo0" type="file" accept="image/*"></label>
+      <label class="file">Snapshot 2 <input id="photo1" type="file" accept="image/*"></label>
+      <label class="file">Snapshot 3 <input id="photo2" type="file" accept="image/*"></label>
+      <label class="file">Snapshot 4 <input id="photo3" type="file" accept="image/*"></label>
+      <button id="samples" type="button">Load sample photos</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Caption</legend>
+      <label>Title <input id="caption" type="text" maxlength="24" value="VICE CITY"></label>
+      <label>Subtitle <input id="subtitle" type="text" maxlength="32" value="sunset drive"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Arrangement</legend>
+      <div class="row" id="layouts">
+        <button type="button" data-layout="fan">Fan</button>
+        <button type="button" data-layout="cascade">Cascade</button>
+        <button type="button" data-layout="grid">Snapshot grid</button>
+      </div>
+      <div class="row">
+        <button id="tiltLeft" type="button">Tilt −</button>
+        <button id="tiltRight" type="button">Tilt +</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Coast light</legend>
+      <div class="row" id="grades">
+        <button type="button" data-grade="vice">Vice Coast</button>
+        <button type="button" data-grade="dusk">Neon Dusk</button>
+        <button type="button" data-grade="gold">Golden Hour</button>
+        <button type="button" data-grade="magenta">Magenta Nights</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Post size</legend>
+      <div class="row" id="sizes">
+        <button type="button" data-size="1920x1080">1920 × 1080</button>
+        <button type="button" data-size="1080x1350">1080 × 1350</button>
+        <button type="button" data-size="1080x1080">1080 × 1080</button>
+      </div>
+    </fieldset>
+
+    <div class="row">
+      <button id="undo" type="button">Undo</button>
+      <button id="redo" type="button">Redo</button>
+    </div>
+    <div class="row">
+      <button id="export" type="button" class="primary">Export PNG</button>
+      <button id="exportAll" type="button">Export all 3 sizes</button>
+    </div>
+    <p id="status" role="status"></p>
+  </section>
+  <section class="stage">
+    <canvas id="cover" width="1280" height="720" aria-label="The cover preview"></canvas>
+    <p class="hint">Drag a snapshot to move it. Scroll over one to zoom its photo. Tilt buttons rotate it.</p>
+  </section>
+</main>
+<script type="module" src="./src/app.js"></script>
+</body>
+</html>
