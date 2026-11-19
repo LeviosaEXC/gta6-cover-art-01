@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon Coast — GTA-style Cover Maker</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div>
+    <h1>NEON COAST</h1>
+    <p class="subtitle">GTA-style cover maker — four panels, one night, one coastal city.</p>
+  </div>
+  <p class="howto" id="howto">Drag a panel to move it. Drag the photo inside its frame to crop. Scroll to zoom. Tilt buttons rotate the panel.</p>
+</header>
+
+<main class="layout">
+  <section class="panel-col" aria-label="Snapshots">
+    <h2>Snapshots</h2>
+    <p class="hint">Each snapshot fills its own panel: 1 goes to panel 1, 2 to panel 2, 3 to panel 3, 4 to panel 4. One photo can fill several panels, or use four different photos.</p>
+    <div id="slots"></div>
+  </section>
+
+  <section class="stage-col" aria-label="Cover preview">
+    <div class="stage-toolbar">
+      <div class="size-group" role="group" aria-label="Cover size">
+        <button type="button" data-size="landscape" class="size-btn active">Landscape 1920 × 1080</button>
+        <button type="button" data-size="portrait" class="size-btn">Portrait 1080 × 1350</button>
+        <button type="button" data-size="square" class="size-btn">Square 1080 × 1080</button>
+      </div>
+      <div class="export-group">
+        <button type="button" id="export-one">Export PNG (this size)</button>
+        <button type="button" id="export-all">Export all 3 sizes</button>
+      </div>
+    </div>
+
+    <div class="cover-wrap">
+      <canvas id="cover" width="1920" height="1080"></canvas>
+    </div>
+    <p class="stage-note">Live preview. Drag inside a photo to pan its crop, scroll over a photo to zoom it, drag a panel by its label bar to swap panels.</p>
+
+    <div class="text-col">
+      <label>Cover title
+        <input id="title-input" type="text" value="NEON COAST" maxlength="24">
+      </label>
+      <label>Tagline
+        <input id="tagline-input" type="text" value="Four panels. One night. One coastal city." maxlength="80">
+      </label>
+      <label>Cover caption
+        <input id="caption-input" type="text" value="The night the coast lit up." maxlength="90">
+      </label>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Original lettering and art direction. No official logos or artwork. Fonts: Alfa Slab One and Caveat under the SIL Open Font License 1.1 (see app/fonts/).</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
