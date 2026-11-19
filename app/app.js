@@ -1,6 +1,8 @@
-// app.js — Neon Coast cover maker (gta6-cover-art-01 V4).
+// app.js — Neon Coast cover maker (gta6-cover-art-01, final).
 // Static, offline, no network. Canvas cover renderer with three
-// aspect-specific layouts, four photo slots, per-panel crop/zoom/tilt.
+// aspect-specific hero-dominant layouts (V1), four photo slots,
+// per-panel crop/zoom/tilt. The cover is full-bleed photos plus the
+// title only, set in Anton.
 "use strict";
 
 const SIZES = {
@@ -14,70 +16,72 @@ const SAMPLES = [
   // centres on. Three samples are portrait posters with big baked-in
   // title text at the top and a tagline at the bottom; the focal point
   // keeps the action band centred and those baked texts out of frame.
-  // (fx stays centred for all four.)
-  { file: "samples/sample1-hero.jpg", label: "Boulevard Chase", cap: "Neon boulevard - the getaway", fy: 0.58 },
+  // (fx stays centred for all four.) These are the landscape defaults;
+  // each aspect layout may override fy/zoom per panel.
+  { file: "samples/sample1-hero.jpg", label: "Boulevard Chase", cap: "Neon boulevard - the getaway", fy: 0.49 },
   { file: "samples/sample2-ferris.jpg", label: "Boardwalk Lights", cap: "Ferris wheel over the pier", fy: 0.48 },
-  { file: "samples/sample3-heist.jpg", label: "Heist Standoff", cap: "Heist vs police - the standoff", fy: 0.62 },
+  { file: "samples/sample3-heist.jpg", label: "Heist Standoff", cap: "Heist vs police - the standoff", fy: 0.56 },
   { file: "samples/sample4-skate.jpg", label: "Night Skate", cap: "Skateboard under neon", fy: 0.48 },
 ];
 
-// One layout per aspect. No shared card positions: each size gets its
-// own title, sun, tagline, grid and caption geometry, so nothing
-// collides at any ratio. Hero panel (index 0) is dominant in all three.
+// One layout per aspect, all FULL-BLEED and HERO-DOMINANT (the V1
+// cover): the four panels tile the whole cover edge to edge, no margin,
+// no gutter, no border, square corners. Panel 1 is the big hero;
+// panels 2-4 share the remaining space. No per-panel names are drawn
+// anywhere; the only text on the cover is the title, overlaid on the
+// hero with a dark scrim behind it. Each rect carries its own fy/zoom
+// defaults so the baked-in poster texts stay out of frame at every
+// aspect; the user's zoom slider multiplies the layout zoom.
+// strip is the invisible swap handle: dragging a panel by its bottom
+// edge swaps it with another panel (no label bar is drawn).
 function layoutFor(sizeKey) {
   if (sizeKey === "portrait") {
     return {
-      // Gap 0: the four panels tile edge-to-edge with no gutter, no
-      // border and square corners, so the grid reads as one continuous
-      // image instead of four separate boxes.
-      margin: 20, gap: 0,
-      title: { x: 20, y: 100, size: 76 },
-      sun: { x: 1014, y: 66, r: 44 },
-      tagline: { x: 20, y: 144, size: 34 },
+      // Hero on top (60% of the height), three panels in a row below.
+      title: { x: 36, y: 112, size: 84, scrim: 230 },
       rects: [
-        { x: 20, y: 174, w: 1040, h: 520 },
-        { x: 20, y: 694, w: 520, h: 252 },
-        { x: 540, y: 694, w: 520, h: 252 },
-        { x: 20, y: 946, w: 1040, h: 246 },
+        { x: 0, y: 0, w: 1080, h: 810, fy: 0.55, zoom: 1.1 },
+        { x: 0, y: 810, w: 360, h: 540, fy: 0.58, zoom: 1.5 },
+        { x: 360, y: 810, w: 360, h: 540, fy: 0.58, zoom: 1.5 },
+        // The skate poster's baked-in title ("CRUISE / WELCOME TO NEON
+        // BAY") sits at ~12-33% height, so this panel zooms tighter
+        // (window 0.34-0.90) to keep it out while the face stays in.
+        { x: 720, y: 810, w: 360, h: 540, fy: 0.62, zoom: 1.8 },
       ],
-      strip: 40, labelSize: 24, caption: { y: 1256, size: 38 },
+      strip: 40,
     };
   }
   if (sizeKey === "square") {
     return {
-      margin: 20, gap: 0,
-      title: { x: 20, y: 94, size: 72 },
-      sun: { x: 1016, y: 64, r: 42 },
-      tagline: { x: 20, y: 138, size: 32 },
+      // Hero on top (60% of the height), three panels in a row below.
+      title: { x: 36, y: 112, size: 84, scrim: 230 },
       rects: [
-        { x: 20, y: 168, w: 1040, h: 400 },
-        { x: 20, y: 568, w: 520, h: 190 },
-        { x: 540, y: 568, w: 520, h: 190 },
-        { x: 20, y: 758, w: 1040, h: 182 },
+        { x: 0, y: 0, w: 1080, h: 648, fy: 0.56 },
+        { x: 0, y: 648, w: 360, h: 432, fy: 0.58, zoom: 1.3 },
+        { x: 360, y: 648, w: 360, h: 432, fy: 0.56, zoom: 1.4 },
+        // Same baked-title dodge as portrait (window 0.35-0.85).
+        { x: 720, y: 648, w: 360, h: 432, fy: 0.60, zoom: 1.6 },
       ],
-      strip: 38, labelSize: 23, caption: { y: 1012, size: 36 },
+      strip: 38,
     };
   }
   return {
-    margin: 24, gap: 0,
-    title: { x: 24, y: 128, size: 108 },
-    sun: { x: 1830, y: 88, r: 64 },
-    tagline: { x: 24, y: 178, size: 42 },
+    // V1: big hero on the left (60% of the width, full height), three
+    // panels stacked on the right.
+    title: { x: 48, y: 155, size: 140, scrim: 340 },
     rects: [
-      { x: 24, y: 208, w: 1120, h: 486 },
-      { x: 1144, y: 208, w: 752, h: 486 },
-      { x: 24, y: 694, w: 912, h: 294 },
-      { x: 936, y: 694, w: 960, h: 294 },
+      { x: 0, y: 0, w: 1152, h: 1080, fy: 0.49, zoom: 1.15 },
+      { x: 1152, y: 0, w: 768, h: 360, fy: 0.48 },
+      { x: 1152, y: 360, w: 768, h: 360, fy: 0.56 },
+      { x: 1152, y: 720, w: 768, h: 360, fy: 0.48 },
     ],
-    strip: 46, labelSize: 28, caption: { y: 1042, size: 42 },
+    strip: 46,
   };
 }
 
 const state = {
   size: "landscape",
   title: "NEON COAST",
-  tagline: "Four panels. One night. One coastal city.",
-  caption: "The night the coast lit up.",
   panels: SAMPLES.map((s) => ({
     label: s.label, cap: s.cap, file: s.file,
     img: null, loaded: false,
@@ -110,13 +114,21 @@ async function loadSamples() {
 
 async function ensureFonts() {
   try {
-    await document.fonts.load('108px "Alfa Slab One"');
-    await document.fonts.load('76px "Alfa Slab One"');
-    await document.fonts.load('42px "Caveat"');
+    await document.fonts.load('140px "Anton"');
+    await document.fonts.load('84px "Anton"');
     await document.fonts.ready;
   } catch (e) {
     // Fall back to system fonts; the cover still draws.
   }
+}
+
+// Effective crop for a panel in a rect: the layout's fy/zoom defaults
+// (per aspect) combined with the user's zoom multiplier.
+function effCrop(p, rect) {
+  return {
+    fy: rect.fy !== undefined ? rect.fy : p.fy,
+    zoom: (rect.zoom || 1) * p.zoom,
+  };
 }
 
 // Focal offset for a panel: how far the crop window recentres from the
@@ -125,19 +137,20 @@ async function ensureFonts() {
 // reach before the image stops covering the frame.
 function focalOffset(p, rect) {
   if (!p.img) return { fox: 0, foy: 0, mx: 0, my: 0 };
+  const e = effCrop(p, rect);
   const base = Math.max(rect.w / p.img.naturalWidth, rect.h / p.img.naturalHeight);
-  const dw = p.img.naturalWidth * base * p.zoom;
-  const dh = p.img.naturalHeight * base * p.zoom;
+  const dw = p.img.naturalWidth * base * e.zoom;
+  const dh = p.img.naturalHeight * base * e.zoom;
   const mx = Math.max(0, (dw - rect.w) / 2);
   const my = Math.max(0, (dh - rect.h) / 2);
   const fox = Math.max(-mx, Math.min(mx, dw * (0.5 - p.fx)));
-  const foy = Math.max(-my, Math.min(my, dh * (0.5 - p.fy)));
+  const foy = Math.max(-my, Math.min(my, dh * (0.5 - e.fy)));
   return { fox, foy, mx, my };
 }
 
 function clampCrop(p, rect) {
   const f = focalOffset(p, rect);
-  if (p.zoom <= 1) { p.ox = 0; p.oy = 0; return; }
+  if (effCrop(p, rect).zoom <= 1) { p.ox = 0; p.oy = 0; return; }
   // User pan (ox/oy) rides on top of the focal offset; the sum must stay
   // inside the cover limits.
   p.ox = Math.max(-(f.mx - Math.abs(f.fox)), Math.min(f.mx - Math.abs(f.fox), p.ox));
@@ -154,20 +167,22 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function drawPanel(ctx, p, rect, strip, labelSize) {
+function drawPanel(ctx, p, rect) {
   ctx.save();
   // Square corners, no frame stroke: with gap 0 the panels tile
-  // edge-to-edge and the grid reads as one continuous image.
+  // edge-to-edge and the grid reads as one continuous image. No label
+  // strip is drawn: panels are image only, no per-photo names.
   roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 0);
   ctx.clip();
   if (p.img && p.loaded) {
     clampCrop(p, rect);
+    const e = effCrop(p, rect);
     const base = Math.max(rect.w / p.img.naturalWidth, rect.h / p.img.naturalHeight);
     // A tilted panel is drawn slightly oversized so its rotated corners
     // still cover the frame and no background wedge shows at the seam.
     const over = p.tilt === 0 ? 1 : 1.02;
-    const dw = p.img.naturalWidth * base * p.zoom * over;
-    const dh = p.img.naturalHeight * base * p.zoom * over;
+    const dw = p.img.naturalWidth * base * e.zoom * over;
+    const dh = p.img.naturalHeight * base * e.zoom * over;
     const f = focalOffset(p, rect);
     const cx = rect.x + rect.w / 2;
     const cy = rect.y + rect.h / 2;
@@ -180,14 +195,6 @@ function drawPanel(ctx, p, rect, strip, labelSize) {
     ctx.fillStyle = "#2a1650";
     ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
   }
-  // Caption strip: dark band at the panel bottom, label inside it.
-  ctx.fillStyle = "rgba(12, 5, 28, 0.78)";
-  ctx.fillRect(rect.x, rect.y + rect.h - strip, rect.w, strip);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "700 " + labelSize + "px 'Trebuchet MS', Arial, sans-serif";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillText(p.label, rect.x + 16, rect.y + rect.h - strip / 2 + 1, rect.w - 32);
   ctx.restore();
 }
 
@@ -197,7 +204,7 @@ function drawCover(ctx, sizeKey) {
   const W = size.w;
   const H = size.h;
 
-  // Sunset backdrop.
+  // Sunset backdrop, only visible where a panel fails to load.
   const bg = ctx.createLinearGradient(0, 0, 0, H);
   bg.addColorStop(0, "#1b1035");
   bg.addColorStop(0.45, "#4b1560");
@@ -206,22 +213,20 @@ function drawCover(ctx, sizeKey) {
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  // Sun: top-right of the title band, clear of the title text.
-  const sunGrad = ctx.createRadialGradient(L.sun.x, L.sun.y, 4, L.sun.x, L.sun.y, L.sun.r);
-  sunGrad.addColorStop(0, "#fff3b0");
-  sunGrad.addColorStop(0.55, "#ffb347");
-  sunGrad.addColorStop(1, "#ff5e62");
-  ctx.fillStyle = sunGrad;
-  ctx.beginPath();
-  ctx.arc(L.sun.x, L.sun.y, L.sun.r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(255, 243, 176, 0.5)";
-  ctx.lineWidth = 3;
-  ctx.stroke();
+  // Four panels in the aspect-specific hero-dominant grid, full-bleed.
+  for (let i = 0; i < 4; i++) {
+    drawPanel(ctx, state.panels[i], L.rects[i]);
+  }
 
-  // Title: original display lettering.
+  // The only text on the cover: the title, overlaid on the hero with
+  // a dark scrim behind it so it stays readable over any scene.
+  const g = ctx.createLinearGradient(0, 0, 0, L.title.scrim);
+  g.addColorStop(0, "rgba(10, 5, 25, 0.78)");
+  g.addColorStop(1, "rgba(10, 5, 25, 0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, L.title.scrim);
   ctx.save();
-  ctx.font = L.title.size + 'px "Alfa Slab One", "Trebuchet MS", serif';
+  ctx.font = L.title.size + 'px "Anton", "Trebuchet MS", sans-serif';
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.shadowColor = "rgba(255, 46, 136, 0.9)";
@@ -230,29 +235,6 @@ function drawCover(ctx, sizeKey) {
   ctx.shadowOffsetY = 4;
   ctx.fillStyle = "#ffffff";
   ctx.fillText(state.title, L.title.x, L.title.y);
-  ctx.restore();
-
-  // Tagline in handwriting.
-  ctx.save();
-  ctx.font = L.tagline.size + 'px "Caveat", cursive';
-  ctx.fillStyle = "#ffd166";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText(state.tagline, L.tagline.x, L.tagline.y);
-  ctx.restore();
-
-  // Four panels in the aspect-specific grid.
-  for (let i = 0; i < 4; i++) {
-    drawPanel(ctx, state.panels[i], L.rects[i], L.strip, L.labelSize);
-  }
-
-  // Bottom cover caption, centred, clear of the grid.
-  ctx.save();
-  ctx.font = L.caption.size + 'px "Caveat", cursive';
-  ctx.fillStyle = "#ffe9f3";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText(state.caption, W / 2, L.caption.y);
   ctx.restore();
 }
 
@@ -437,14 +419,6 @@ function bindControls() {
   });
   document.getElementById("title-input").addEventListener("input", (e) => {
     state.title = e.target.value.toUpperCase();
-    renderPreview();
-  });
-  document.getElementById("tagline-input").addEventListener("input", (e) => {
-    state.tagline = e.target.value;
-    renderPreview();
-  });
-  document.getElementById("caption-input").addEventListener("input", (e) => {
-    state.caption = e.target.value;
     renderPreview();
   });
   document.getElementById("export-one").addEventListener("click", () => downloadPNG(state.size));

@@ -1,4 +1,4 @@
-// main.ts — gta6-cover-art-01 V4 "Neon Coast" cover maker.
+// main.ts — gta6-cover-art-01 "Neon Coast" cover maker (final).
 // Deterministic bundle verifier. Node 22+, stdlib only, no network.
 // Usage: node main.ts
 // Prints a sorted JSON report of every bundle check to stdout and exits
@@ -18,8 +18,8 @@ const APP_FILES: string[] = [
   "app/index.html",
   "app/app.js",
   "app/styles.css",
-  "app/fonts/AlfaSlabOne-Regular.ttf",
-  "app/fonts/OFL-AlfaSlabOne.txt",
+  "app/fonts/Anton-Regular.ttf",
+  "app/fonts/OFL-Anton.txt",
   "app/fonts/Caveat.ttf",
   "app/fonts/OFL-Caveat.txt",
   "app/samples/sample1-hero.jpg",
@@ -137,7 +137,7 @@ function checkSamplesDistinct(checks: Check[]): void {
 }
 
 function checkOfl(checks: Check[]): void {
-  for (const name of ["OFL-AlfaSlabOne.txt", "OFL-Caveat.txt"]) {
+  for (const name of ["OFL-Anton.txt", "OFL-Caveat.txt"]) {
     const body = readText(join(ROOT, "app/fonts/" + name));
     const ok = body.includes("SIL OPEN FONT LICENSE") &&
       body.includes("Version 1.1") &&
@@ -150,6 +150,27 @@ function checkOfl(checks: Check[]): void {
   }
 }
 
+function checkFontSwap(checks: Check[]): void {
+  // The rejected title font must be fully gone; the final title font
+  // (Anton) must be the one the app actually references.
+  const alfaGone =
+    !existsSync(join(ROOT, "app/fonts/AlfaSlabOne-Regular.ttf")) &&
+    !existsSync(join(ROOT, "app/fonts/OFL-AlfaSlabOne.txt"));
+  checks.push({
+    name: "fonts:alfa-absent",
+    ok: alfaGone,
+    detail: alfaGone ? "no Alfa Slab One files in the bundle" : "Alfa Slab One still present",
+  });
+  const appFiles = ["app/index.html", "app/app.js", "app/styles.css"];
+  const usesAnton = appFiles.every((rel) => readText(join(ROOT, rel)).includes("Anton"));
+  const noAlfa = appFiles.every((rel) => !readText(join(ROOT, rel)).includes("Alfa"));
+  checks.push({
+    name: "fonts:anton-in-app",
+    ok: usesAnton && noAlfa,
+    detail: usesAnton && noAlfa ? "Anton referenced, no Alfa references" : "font references wrong",
+  });
+}
+
 function main(): number {
   const checks: Check[] = [];
   checkFilesExist(APP_FILES, checks);
@@ -160,6 +181,7 @@ function main(): number {
   checkOwner(checks);
   checkSamplesDistinct(checks);
   checkOfl(checks);
+  checkFontSwap(checks);
 
   const files: Record<string, string> = {};
   for (const rel of [...APP_FILES, ...REPO_FILES].sort()) {
@@ -170,7 +192,7 @@ function main(): number {
   const passed = checks.filter((c) => c.ok).length;
   const report = {
     bundle: "gta6-cover-art-01",
-    entry: "V4 Neon Coast",
+    entry: "Neon Coast final (V1 hero-dominant, Anton)",
     checks: checks.sort((a, b) => a.name.localeCompare(b.name)),
     files,
     passed,

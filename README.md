@@ -9,9 +9,23 @@ Entry for [gta6-cover-art-01](https://make.fun/c/gta6-cover-art-01) — "Make GT
 ## What it is
 
 A fully offline cover-art maker. Load your own photos (or use the four bundled
-illustrated samples), arrange them in a 2×2 panel grid telling one coastal-city
-action story, edit the title, tagline and caption, and export a PNG cover in
+illustrated samples), arrange them in a hero-dominant layout telling one coastal-city
+action story, edit the title, and export a PNG cover in
 three sizes: landscape 1920×1080, portrait 1080×1350, and square 1080×1080.
+
+## Final (submit #2) — V1 hero-dominant + Anton
+
+The submitted entry adapts the winning V1 cover variant: one big boulevard
+panel dominates (left in landscape, on top in portrait and square) with the
+other three panels sharing the rest of the cover, all full-bleed edge to edge
+with no margins, no gutters and no per-panel names. The only text on the cover
+is the title "NEON COAST", overlaid on the hero in Anton — the bold condensed
+OFL display font that replaces the rejected Alfa Slab One (removed entirely:
+font file, license text and every reference). The drawn sun, the tagline and
+the bottom caption from V4 are gone; panel swapping now works by dragging a
+panel by its bottom edge (the handle is invisible, so the cover stays clean).
+V3 diagonal and V10 banner-bottom are kept as backup layouts in `variants/`
+(uncommitted).
 
 ## V4 — what changed from V3
 
@@ -34,8 +48,8 @@ were never used. V4 fixes all three, following the advisor diagnosis:
 1. Open `app/index.html` in a browser (no server, no network needed).
 2. Upload up to four snapshots, or keep the bundled illustrated samples.
 3. Drag inside a photo to pan its crop, scroll over it to zoom, use the tilt
-   buttons to rotate the panel, drag a panel by its label bar to swap it.
-4. Edit the title, tagline and caption.
+   buttons to rotate the panel, drag a panel by its bottom edge to swap it.
+4. Edit the title.
 5. Pick a size and hit **Export PNG**, or **Export all 3 sizes**.
 
 ## Verify
@@ -46,15 +60,16 @@ node main.ts
 
 `main.ts` (Node 22+, stdlib only, no network) checks the bundle — all files
 present, no network/eval references in the app, SPDX license line, the three
-README badges, the owner wallet, four distinct samples, and the OFL license
-texts — then prints a deterministic JSON report. Run it twice: the output is
+README badges, the owner wallet, four distinct samples, the OFL license
+texts, and the font swap (Anton present and referenced, Alfa Slab One fully
+gone) — then prints a deterministic JSON report. Run it twice: the output is
 byte-identical.
 
 ## Files
 
 - `app/index.html`, `app/app.js`, `app/styles.css` — the maker (static, offline).
 - `app/samples/` — four illustrated sample scenes in the cover-art style.
-- `app/fonts/` — Alfa Slab One and Caveat under the SIL Open Font License 1.1
+- `app/fonts/` — Anton (title) and Caveat under the SIL Open Font License 1.1
   (license texts shipped beside the font files).
 - `main.ts` — deterministic bundle verifier.
 - `LICENSE` — MIT.
