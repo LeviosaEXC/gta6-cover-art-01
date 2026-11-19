@@ -9,21 +9,29 @@ Entry for [gta6-cover-art-01](https://make.fun/c/gta6-cover-art-01) — "Make GT
 ## What it is
 
 A fully offline cover-art maker. Load your own photos (or use the four bundled
-illustrated samples), arrange them in a hero-dominant layout telling one coastal-city
+illustrated samples), arrange them in a per-aspect layout telling one coastal-city
 action story, edit the title, and export a PNG cover in
 three sizes: landscape 1920×1080, portrait 1080×1350, and square 1080×1080.
 
-## Final (submit #2) — V1 hero-dominant + Anton
+## Final (submit #2) — per-orientation layouts + Anton
 
-The submitted entry adapts the winning V1 cover variant: one big boulevard
-panel dominates (left in landscape, on top in portrait and square) with the
-other three panels sharing the rest of the cover, all full-bleed edge to edge
-with no margins, no gutters and no per-panel names. The only text on the cover
-is the title "NEON COAST", overlaid on the hero in Anton — the bold condensed
-OFL display font that replaces the rejected Alfa Slab One (removed entirely:
-font file, license text and every reference). The drawn sun, the tagline and
-the bottom caption from V4 are gone; panel swapping now works by dragging a
-panel by its bottom edge (the handle is invisible, so the cover stays clean).
+Each aspect gets its own composition, all full-bleed edge to edge with no
+margins, no gutters and no per-panel names. The only text on the cover is
+the title "NEON COAST", overlaid in Anton — the bold condensed OFL display
+font that replaces the rejected Alfa Slab One (removed entirely: font file,
+license text and every reference). The drawn sun, the tagline and the bottom
+caption from V4 are gone; panel swapping now works by dragging a panel by
+its bottom edge (the handle is invisible, so the cover stays clean).
+
+- **Landscape 1920×1080 — V1 hero-dominant:** one big boulevard panel on
+  the left (60% of the width, full height) with the other three panels
+  stacked on the right.
+- **Portrait 1080×1350 — V3 diagonal:** four full-height slanted strips
+  side by side (boulevard / ferris / heist / skate), leaning right at the
+  top, with sunset-gradient wedges in the outer corners.
+- **Square 1080×1080 — banner:** the boulevard hero spans the full width
+  on top (55% of the height), with the other three panels in a row below.
+
 V3 diagonal and V10 banner-bottom are kept as backup layouts in `variants/`
 (uncommitted).
 
@@ -61,8 +69,9 @@ node main.ts
 `main.ts` (Node 22+, stdlib only, no network) checks the bundle — all files
 present, no network/eval references in the app, SPDX license line, the three
 README badges, the owner wallet, four distinct samples, the OFL license
-texts, and the font swap (Anton present and referenced, Alfa Slab One fully
-gone) — then prints a deterministic JSON report. Run it twice: the output is
+texts, the font swap (Anton present and referenced, Alfa Slab One fully
+gone), and the three per-orientation layouts (V1 hero landscape, diagonal
+portrait, banner square) — then prints a deterministic JSON report. Run it twice: the output is
 byte-identical.
 
 ## Files

@@ -1,8 +1,8 @@
 // app.js — Neon Coast cover maker (gta6-cover-art-01, final).
 // Static, offline, no network. Canvas cover renderer with three
-// aspect-specific hero-dominant layouts (V1), four photo slots,
-// per-panel crop/zoom/tilt. The cover is full-bleed photos plus the
-// title only, set in Anton.
+// aspect-specific layouts (V1 hero-dominant landscape, V3 diagonal
+// portrait, banner square), four photo slots, per-panel crop/zoom/tilt.
+// The cover is full-bleed photos plus the title only, set in Anton.
 "use strict";
 
 const SIZES = {
@@ -24,43 +24,49 @@ const SAMPLES = [
   { file: "samples/sample4-skate.jpg", label: "Night Skate", cap: "Skateboard under neon", fy: 0.48 },
 ];
 
-// One layout per aspect, all FULL-BLEED and HERO-DOMINANT (the V1
-// cover): the four panels tile the whole cover edge to edge, no margin,
-// no gutter, no border, square corners. Panel 1 is the big hero;
-// panels 2-4 share the remaining space. No per-panel names are drawn
-// anywhere; the only text on the cover is the title, overlaid on the
-// hero with a dark scrim behind it. Each rect carries its own fy/zoom
-// defaults so the baked-in poster texts stay out of frame at every
+// One layout per aspect, all FULL-BLEED: the panels tile the whole cover
+// edge to edge, no margin, no gutter, no border, square corners. Each
+// aspect gets its own composition — landscape is the V1 hero-dominant
+// cover, portrait is four diagonal strips (V3), square is a full-width
+// boulevard banner on top with three panels below. No per-panel names
+// are drawn anywhere; the only text on the cover is the title, overlaid
+// with a dark scrim behind it. Each rect carries its own fy/zoom (and
+// fx) defaults so the baked-in poster texts stay out of frame at every
 // aspect; the user's zoom slider multiplies the layout zoom.
 // strip is the invisible swap handle: dragging a panel by its bottom
 // edge swaps it with another panel (no label bar is drawn).
+// A rect with slant is a diagonal strip: its clip is the parallelogram
+// (x+slant, y), (x+w+slant, y), (x+w-slant, y+h), (x-slant, y+h), so
+// the top edge leans right by slant and the bottom edge leans left.
 function layoutFor(sizeKey) {
   if (sizeKey === "portrait") {
     return {
-      // Hero on top (60% of the height), three panels in a row below.
+      // Diagonal strips (V3): four full-height strips side by side,
+      // boulevard / ferris / heist / skate, leaning right at the top.
+      // The outer corners leave sunset-gradient wedges, as in V3.
       title: { x: 36, y: 112, size: 84, scrim: 230 },
       rects: [
-        { x: 0, y: 0, w: 1080, h: 810, fy: 0.55, zoom: 1.1 },
-        { x: 0, y: 810, w: 360, h: 540, fy: 0.58, zoom: 1.5 },
-        { x: 360, y: 810, w: 360, h: 540, fy: 0.58, zoom: 1.5 },
+        { x: 0, y: 0, w: 270, h: 1350, fy: 0.50, zoom: 1.6, slant: 75 },
+        { x: 270, y: 0, w: 270, h: 1350, fy: 0.58, zoom: 1.6, slant: 75 },
+        { x: 540, y: 0, w: 270, h: 1350, fy: 0.56, zoom: 1.4, slant: 75 },
         // The skate poster's baked-in title ("CRUISE / WELCOME TO NEON
-        // BAY") sits at ~12-33% height, so this panel zooms tighter
-        // (window 0.34-0.90) to keep it out while the face stays in.
-        { x: 720, y: 810, w: 360, h: 540, fy: 0.62, zoom: 1.8 },
+        // BAY") sits at ~12-33% height, so this strip zooms tighter
+        // and shifts right (fx 0.62) to keep it out and the face in.
+        { x: 810, y: 0, w: 270, h: 1350, fy: 0.62, fx: 0.62, zoom: 1.8, slant: 75 },
       ],
       strip: 40,
     };
   }
   if (sizeKey === "square") {
     return {
-      // Hero on top (60% of the height), three panels in a row below.
+      // Banner: full-width boulevard hero on top (55% of the height),
+      // three panels in a row below (ferris / heist / skate).
       title: { x: 36, y: 112, size: 84, scrim: 230 },
       rects: [
-        { x: 0, y: 0, w: 1080, h: 648, fy: 0.56 },
-        { x: 0, y: 648, w: 360, h: 432, fy: 0.58, zoom: 1.3 },
-        { x: 360, y: 648, w: 360, h: 432, fy: 0.56, zoom: 1.4 },
-        // Same baked-title dodge as portrait (window 0.35-0.85).
-        { x: 720, y: 648, w: 360, h: 432, fy: 0.60, zoom: 1.6 },
+        { x: 0, y: 0, w: 1080, h: 594, fy: 0.56 },
+        { x: 0, y: 594, w: 360, h: 486, fy: 0.58, zoom: 1.5 },
+        { x: 360, y: 594, w: 360, h: 486, fy: 0.58, zoom: 1.5 },
+        { x: 720, y: 594, w: 360, h: 486, fy: 0.60, zoom: 1.7 },
       ],
       strip: 38,
     };
@@ -122,10 +128,11 @@ async function ensureFonts() {
   }
 }
 
-// Effective crop for a panel in a rect: the layout's fy/zoom defaults
+// Effective crop for a panel in a rect: the layout's fx/fy/zoom defaults
 // (per aspect) combined with the user's zoom multiplier.
 function effCrop(p, rect) {
   return {
+    fx: rect.fx !== undefined ? rect.fx : p.fx,
     fy: rect.fy !== undefined ? rect.fy : p.fy,
     zoom: (rect.zoom || 1) * p.zoom,
   };
@@ -143,7 +150,7 @@ function focalOffset(p, rect) {
   const dh = p.img.naturalHeight * base * e.zoom;
   const mx = Math.max(0, (dw - rect.w) / 2);
   const my = Math.max(0, (dh - rect.h) / 2);
-  const fox = Math.max(-mx, Math.min(mx, dw * (0.5 - p.fx)));
+  const fox = Math.max(-mx, Math.min(mx, dw * (0.5 - e.fx)));
   const foy = Math.max(-my, Math.min(my, dh * (0.5 - e.fy)));
   return { fox, foy, mx, my };
 }
@@ -172,7 +179,19 @@ function drawPanel(ctx, p, rect) {
   // Square corners, no frame stroke: with gap 0 the panels tile
   // edge-to-edge and the grid reads as one continuous image. No label
   // strip is drawn: panels are image only, no per-photo names.
-  roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 0);
+  // A slanted rect clips to a parallelogram instead of a rectangle:
+  // the top edge leans right by slant, the bottom edge leans left.
+  if (rect.slant) {
+    const s = rect.slant;
+    ctx.beginPath();
+    ctx.moveTo(rect.x + s, rect.y);
+    ctx.lineTo(rect.x + rect.w + s, rect.y);
+    ctx.lineTo(rect.x + rect.w - s, rect.y + rect.h);
+    ctx.lineTo(rect.x - s, rect.y + rect.h);
+    ctx.closePath();
+  } else {
+    roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 0);
+  }
   ctx.clip();
   if (p.img && p.loaded) {
     clampCrop(p, rect);
@@ -213,7 +232,7 @@ function drawCover(ctx, sizeKey) {
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  // Four panels in the aspect-specific hero-dominant grid, full-bleed.
+  // Four panels in the aspect-specific layout, full-bleed.
   for (let i = 0; i < 4; i++) {
     drawPanel(ctx, state.panels[i], L.rects[i]);
   }
@@ -340,7 +359,18 @@ function hitPanel(pt) {
   const L = layoutFor(state.size);
   for (let i = 0; i < 4; i++) {
     const rc = L.rects[i];
-    if (pt.x >= rc.x && pt.x <= rc.x + rc.w && pt.y >= rc.y && pt.y <= rc.y + rc.h) {
+    if (pt.y < rc.y || pt.y > rc.y + rc.h) continue;
+    // A slanted rect is a parallelogram: at height t the strip spans
+    // from left = x + slant*(1 - 2t) to right = x + w + slant*(1 - 2t).
+    let left = rc.x;
+    let right = rc.x + rc.w;
+    if (rc.slant) {
+      const t = (pt.y - rc.y) / rc.h;
+      const lean = rc.slant * (1 - 2 * t);
+      left = rc.x + lean;
+      right = rc.x + rc.w + lean;
+    }
+    if (pt.x >= left && pt.x <= right) {
       const onStrip = pt.y >= rc.y + rc.h - L.strip;
       return { index: i, onStrip, rect: rc };
     }

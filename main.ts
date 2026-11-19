@@ -150,6 +150,21 @@ function checkOfl(checks: Check[]): void {
   }
 }
 
+function checkLayouts(checks: Check[]): void {
+  // The three per-orientation compositions must be the ones in the app:
+  // V1 hero-dominant landscape, V3 diagonal portrait, banner square.
+  const src = readText(join(ROOT, "app/app.js"));
+  const cases: Array<[string, string, string]> = [
+    ["layouts:landscape-v1-hero", "w: 1152, h: 1080", "landscape hero rect missing"],
+    ["layouts:portrait-diagonal", "slant: 75", "portrait diagonal strips missing"],
+    ["layouts:square-banner", "w: 1080, h: 594", "square banner hero missing"],
+  ];
+  for (const [name, needle, detail] of cases) {
+    const ok = src.includes(needle);
+    checks.push({ name, ok, detail: ok ? needle : detail });
+  }
+}
+
 function checkFontSwap(checks: Check[]): void {
   // The rejected title font must be fully gone; the final title font
   // (Anton) must be the one the app actually references.
@@ -182,6 +197,7 @@ function main(): number {
   checkSamplesDistinct(checks);
   checkOfl(checks);
   checkFontSwap(checks);
+  checkLayouts(checks);
 
   const files: Record<string, string> = {};
   for (const rel of [...APP_FILES, ...REPO_FILES].sort()) {
@@ -192,7 +208,7 @@ function main(): number {
   const passed = checks.filter((c) => c.ok).length;
   const report = {
     bundle: "gta6-cover-art-01",
-    entry: "Neon Coast final (V1 hero-dominant, Anton)",
+    entry: "Neon Coast final (per-orientation layouts, Anton)",
     checks: checks.sort((a, b) => a.name.localeCompare(b.name)),
     files,
     passed,
