@@ -1,286 +1,209 @@
-// app.js — Neon Coast cover maker (gta6-cover-art-01, final).
-// Static, offline, no network. Canvas cover renderer with three
-// aspect-specific layouts (V1 hero-dominant landscape, hero-top
-// portrait, banner square) plus a V3 diagonal landscape render
-// (?layout=diagonal), four photo slots, per-panel crop/zoom/tilt.
-// The cover is full-bleed photos plus the title only, set in Anton.
 "use strict";
 
-const SIZES = {
+var SIZES = {
   landscape: { w: 1920, h: 1080, label: "Landscape 1920 x 1080" },
   portrait: { w: 1080, h: 1350, label: "Portrait 1080 x 1350" },
   square: { w: 1080, h: 1080, label: "Square 1080 x 1080" },
 };
 
-const SAMPLES = [
-  // fy is the focal height (fraction of the image) the crop window
-  // centres on. Three samples are portrait posters with big baked-in
-  // title text at the top and a tagline at the bottom; the focal point
-  // keeps the action band centred and those baked texts out of frame.
-  // (fx stays centred for all four.) These are the landscape defaults;
-  // each aspect layout may override fy/zoom per panel.
-  { file: "samples/sample1-hero.jpg", label: "Boulevard Chase", cap: "Neon boulevard - the getaway", fy: 0.49 },
-  { file: "samples/sample2-ferris.jpg", label: "Boardwalk Lights", cap: "Ferris wheel over the pier", fy: 0.48 },
-  { file: "samples/sample3-heist.jpg", label: "Heist Standoff", cap: "Heist vs police - the standoff", fy: 0.56 },
-  { file: "samples/sample4-skate.jpg", label: "Night Skate", cap: "Skateboard under neon", fy: 0.48 },
+var SAMPLES = [
+  { file: "samples/sample1-hero.jpg", label: "Boulevard Chase", caption: "Neon boulevard - the getaway", fy: 0.49 },
+  { file: "samples/sample2-ferris.jpg", label: "Boardwalk Lights", caption: "Ferris wheel over the pier", fy: 0.48 },
+  { file: "samples/sample3-heist.jpg", label: "Heist Standoff", caption: "Heist vs police - the standoff", fy: 0.56 },
+  { file: "samples/sample4-skate.jpg", label: "Night Skate", caption: "Skateboard under neon", fy: 0.48 },
 ];
 
-// One layout per aspect, all FULL-BLEED: the panels tile the whole cover
-// edge to edge, no margin, no gutter, no border, square corners. Each
-// aspect gets its own composition — landscape is the V1 hero-dominant
-// cover, portrait is the hero on top with three panels below, square is
-// a full-width boulevard banner on top with three panels below. The V3
-// diagonal strips live in diagonalLayout() as a separate landscape
-// screenshot render (?layout=diagonal), not an export size. No
-// per-panel names are drawn anywhere; the only text on the cover is the
-// title, overlaid with a dark scrim behind it. Each rect carries its own
-// fy/zoom (and fx) defaults so the baked-in poster texts stay out of
-// frame at every aspect; the user's zoom slider multiplies the layout
-// zoom.
-// strip is the invisible swap handle: dragging a panel by its bottom
-// edge swaps it with another panel (no label bar is drawn).
-// A rect with slant is a diagonal strip: its clip is the parallelogram
-// (x+slant, y), (x+w+slant, y), (x+w-slant, y+h), (x-slant, y+h), so
-// the top edge leans right by slant and the bottom edge leans left.
-function layoutFor(sizeKey) {
-  if (sizeKey === "portrait") {
-    return {
-      // Hero on top (60% of the height), three panels in a row below.
-      title: { x: 36, y: 112, size: 84, scrim: 230 },
-      rects: [
-        { x: 0, y: 0, w: 1080, h: 810, fy: 0.55, zoom: 1.1 },
-        { x: 0, y: 810, w: 360, h: 540, fy: 0.58, zoom: 1.5 },
-        { x: 360, y: 810, w: 360, h: 540, fy: 0.58, zoom: 1.5 },
-        // The skate poster's baked-in title ("CRUISE / WELCOME TO NEON
-        // BAY") sits at ~12-33% height, so this panel zooms tighter
-        // (window 0.34-0.90) to keep it out while the face stays in.
-        { x: 720, y: 810, w: 360, h: 540, fy: 0.62, zoom: 1.8 },
-      ],
-      strip: 40,
-    };
-  }
-  if (sizeKey === "square") {
-    return {
-      // Banner: full-width boulevard hero on top (55% of the height),
-      // three panels in a row below (ferris / heist / skate).
-      title: { x: 36, y: 112, size: 84, scrim: 230 },
-      rects: [
-        { x: 0, y: 0, w: 1080, h: 594, fy: 0.56 },
-        { x: 0, y: 594, w: 360, h: 486, fy: 0.58, zoom: 1.5 },
-        { x: 360, y: 594, w: 360, h: 486, fy: 0.58, zoom: 1.5 },
-        { x: 720, y: 594, w: 360, h: 486, fy: 0.60, zoom: 1.7 },
-      ],
-      strip: 38,
-    };
-  }
+function layoutLandscape() {
   return {
-    // V1: big hero on the left (60% of the width, full height), three
-    // panels stacked on the right.
     title: { x: 48, y: 155, size: 140, scrim: 340 },
+    strip: 46,
     rects: [
       { x: 0, y: 0, w: 1152, h: 1080, fy: 0.49, zoom: 1.15 },
       { x: 1152, y: 0, w: 768, h: 360, fy: 0.48 },
       { x: 1152, y: 360, w: 768, h: 360, fy: 0.56 },
       { x: 1152, y: 720, w: 768, h: 360, fy: 0.48 },
     ],
-    strip: 46,
   };
 }
 
-// The diagonal cover (V3): four full-height slanted strips side by
-// side at LANDSCAPE size, boulevard / ferris / heist / skate, leaning
-// right at the top, with sunset-gradient wedges in the outer corners.
-// This is a screenshot render, not an export size: it is only drawn
-// when the page is opened with ?layout=diagonal. Geometry and crops
-// are exactly the V3 variant's (sw 480, slant 60); the title is the
-// app's landscape title in Anton.
+function layoutPortrait() {
+  return {
+    title: { x: 36, y: 112, size: 84, scrim: 230 },
+    strip: 40,
+    rects: [
+      { x: 0, y: 0, w: 1080, h: 810, fy: 0.55, zoom: 1.1 },
+      { x: 0, y: 810, w: 360, h: 540, fy: 0.58, zoom: 1.5 },
+      { x: 360, y: 810, w: 360, h: 540, fy: 0.58, zoom: 1.5 },
+      { x: 720, y: 810, w: 360, h: 540, fy: 0.62, zoom: 1.8 },
+    ],
+  };
+}
+
+function layoutSquare() {
+  return {
+    title: { x: 36, y: 112, size: 84, scrim: 230 },
+    strip: 38,
+    rects: [
+      { x: 0, y: 0, w: 1080, h: 594, fy: 0.56 },
+      { x: 0, y: 594, w: 360, h: 486, fy: 0.58, zoom: 1.5 },
+      { x: 360, y: 594, w: 360, h: 486, fy: 0.58, zoom: 1.5 },
+      { x: 720, y: 594, w: 360, h: 486, fy: 0.60, zoom: 1.7 },
+    ],
+  };
+}
+
 function diagonalLayout() {
   return {
     title: { x: 48, y: 155, size: 140, scrim: 340 },
+    strip: 46,
     rects: [
       { x: 0, y: 0, w: 480, h: 1080, fy: 0.50, zoom: 1.6, slant: 60 },
       { x: 480, y: 0, w: 480, h: 1080, fy: 0.60, zoom: 1.5, slant: 60 },
       { x: 960, y: 0, w: 480, h: 1080, fy: 0.58, zoom: 1.5, slant: 60 },
       { x: 1440, y: 0, w: 480, h: 1080, fy: 0.62, zoom: 1.55, slant: 60 },
     ],
-    strip: 46,
   };
 }
 
-// The layout actually drawn for a size: the diagonal render when the
-// page asked for it at landscape, otherwise the standard per-aspect
-// layout. Exports from the editor always use the standard layouts.
-function layoutToDraw(sizeKey) {
-  if (sizeKey === state.size && state.layoutOverride === "diagonal") {
-    return diagonalLayout();
-  }
-  return layoutFor(sizeKey);
+function layoutFor(size) {
+  if (size === "portrait") { return layoutPortrait(); }
+  if (size === "square") { return layoutSquare(); }
+  return layoutLandscape();
 }
 
-const state = {
+var state = {
   size: "landscape",
   title: "NEON COAST",
-  // "diagonal" renders the V3 diagonal strips instead of the standard
-  // landscape layout; set only from the ?layout=diagonal query param.
   layoutOverride: null,
-  panels: SAMPLES.map((s) => ({
-    label: s.label, cap: s.cap, file: s.file,
-    img: null, loaded: false,
-    fx: 0.5, fy: s.fy,
-    zoom: 1, ox: 0, oy: 0, tilt: 0,
-  })),
+  panels: SAMPLES.map(function (s) {
+    return {
+      label: s.label,
+      caption: s.caption,
+      file: s.file,
+      image: null,
+      loaded: false,
+      fx: 0.5,
+      fy: s.fy,
+      zoom: 1,
+      ox: 0,
+      oy: 0,
+      tilt: 0,
+    };
+  }),
 };
 
-function loadImage(src) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("cannot load " + src));
-    img.src = src;
-  });
-}
-
-async function loadSamples() {
-  const jobs = state.panels.map(async (p) => {
-    try {
-      p.img = await loadImage(p.file);
-      p.loaded = true;
-    } catch (e) {
-      p.img = null;
-      p.loaded = false;
-    }
-  });
-  await Promise.all(jobs);
-}
-
-async function ensureFonts() {
-  try {
-    await document.fonts.load('140px "Anton"');
-    await document.fonts.load('84px "Anton"');
-    await document.fonts.ready;
-  } catch (e) {
-    // Fall back to system fonts; the cover still draws.
+function layoutToDraw() {
+  if (state.layoutOverride === "diagonal" && state.size === "landscape") {
+    return diagonalLayout();
   }
+  return layoutFor(state.size);
 }
 
-// Effective crop for a panel in a rect: the layout's fx/fy/zoom defaults
-// (per aspect) combined with the user's zoom multiplier.
-function effCrop(p, rect) {
-  return {
-    fx: rect.fx !== undefined ? rect.fx : p.fx,
-    fy: rect.fy !== undefined ? rect.fy : p.fy,
-    zoom: (rect.zoom || 1) * p.zoom,
-  };
+function clamp(v, lo, hi) {
+  if (v < lo) { return lo; }
+  if (v > hi) { return hi; }
+  return v;
 }
 
-// Focal offset for a panel: how far the crop window recentres from the
-// image middle, in screen px, so the focal point (fx, fy) lands in the
-// middle of the frame. mx/my are the hard limits the total offset may
-// reach before the image stops covering the frame.
-function focalOffset(p, rect) {
-  if (!p.img) return { fox: 0, foy: 0, mx: 0, my: 0 };
-  const e = effCrop(p, rect);
-  const base = Math.max(rect.w / p.img.naturalWidth, rect.h / p.img.naturalHeight);
-  const dw = p.img.naturalWidth * base * e.zoom;
-  const dh = p.img.naturalHeight * base * e.zoom;
-  const mx = Math.max(0, (dw - rect.w) / 2);
-  const my = Math.max(0, (dh - rect.h) / 2);
-  const fox = Math.max(-mx, Math.min(mx, dw * (0.5 - e.fx)));
-  const foy = Math.max(-my, Math.min(my, dh * (0.5 - e.fy)));
-  return { fox, foy, mx, my };
-}
-
-function clampCrop(p, rect) {
-  const f = focalOffset(p, rect);
-  if (effCrop(p, rect).zoom <= 1) { p.ox = 0; p.oy = 0; return; }
-  // User pan (ox/oy) rides on top of the focal offset; the sum must stay
-  // inside the cover limits.
-  p.ox = Math.max(-(f.mx - Math.abs(f.fox)), Math.min(f.mx - Math.abs(f.fox), p.ox));
-  p.oy = Math.max(-(f.my - Math.abs(f.foy)), Math.min(f.my - Math.abs(f.foy), p.oy));
-}
-
-function roundRectPath(ctx, x, y, w, h, r) {
+function rectPath(ctx, rect) {
+  var x = rect.x;
+  var y = rect.y;
+  var w = rect.w;
+  var h = rect.h;
+  var slant = rect.slant || 0;
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-}
-
-function drawPanel(ctx, p, rect) {
-  ctx.save();
-  // Square corners, no frame stroke: with gap 0 the panels tile
-  // edge-to-edge and the grid reads as one continuous image. No label
-  // strip is drawn: panels are image only, no per-photo names.
-  // A slanted rect clips to a parallelogram instead of a rectangle:
-  // the top edge leans right by slant, the bottom edge leans left.
-  if (rect.slant) {
-    const s = rect.slant;
-    ctx.beginPath();
-    ctx.moveTo(rect.x + s, rect.y);
-    ctx.lineTo(rect.x + rect.w + s, rect.y);
-    ctx.lineTo(rect.x + rect.w - s, rect.y + rect.h);
-    ctx.lineTo(rect.x - s, rect.y + rect.h);
+  if (slant) {
+    ctx.moveTo(x + slant, y);
+    ctx.lineTo(x + w + slant, y);
+    ctx.lineTo(x + w - slant, y + h);
+    ctx.lineTo(x - slant, y + h);
     ctx.closePath();
   } else {
-    roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 0);
+    ctx.rect(x, y, w, h);
   }
-  ctx.clip();
-  if (p.img && p.loaded) {
-    clampCrop(p, rect);
-    const e = effCrop(p, rect);
-    const base = Math.max(rect.w / p.img.naturalWidth, rect.h / p.img.naturalHeight);
-    // A tilted panel is drawn slightly oversized so its rotated corners
-    // still cover the frame and no background wedge shows at the seam.
-    const over = p.tilt === 0 ? 1 : 1.02;
-    const dw = p.img.naturalWidth * base * e.zoom * over;
-    const dh = p.img.naturalHeight * base * e.zoom * over;
-    const f = focalOffset(p, rect);
-    const cx = rect.x + rect.w / 2;
-    const cy = rect.y + rect.h / 2;
-    ctx.translate(cx, cy);
-    ctx.rotate((p.tilt * Math.PI) / 180);
-    ctx.drawImage(p.img, -dw / 2 + f.fox + p.ox, -dh / 2 + f.foy + p.oy, dw, dh);
-    ctx.rotate((-p.tilt * Math.PI) / 180);
-    ctx.translate(-cx, -cy);
-  } else {
+}
+
+function hitPanel(layout, px, py) {
+  for (var i = layout.rects.length - 1; i >= 0; i--) {
+    var r = layout.rects[i];
+    if (py < r.y || py > r.y + r.h) { continue; }
+    var t = (py - r.y) / r.h;
+    var slant = r.slant || 0;
+    var left = r.x + slant * (1 - 2 * t);
+    var right = left + r.w;
+    if (px >= left && px <= right) { return i; }
+  }
+  return -1;
+}
+
+function drawPanel(ctx, rect, panel) {
+  if (!panel.loaded || !panel.image) {
+    ctx.save();
+    rectPath(ctx, rect);
     ctx.fillStyle = "#2a1650";
-    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    ctx.fill();
+    ctx.restore();
+    return;
   }
+  var img = panel.image;
+  var fx = rect.fx !== undefined ? rect.fx : panel.fx;
+  var fy = rect.fy !== undefined ? rect.fy : panel.fy;
+  var effZoom = (rect.zoom || 1) * panel.zoom;
+  var tilted = (panel.tilt !== 0) || !!rect.slant;
+  var base = Math.max(rect.w / img.naturalWidth, rect.h / img.naturalHeight);
+  var scale = base * effZoom * (tilted ? 1.02 : 1);
+  var dw = img.naturalWidth * scale;
+  var dh = img.naturalHeight * scale;
+  var cx = rect.x + rect.w / 2;
+  var cy = rect.y + rect.h / 2;
+  var ox = panel.ox;
+  var oy = panel.oy;
+  if (effZoom <= 1) {
+    ox = 0;
+    oy = 0;
+    panel.ox = 0;
+    panel.oy = 0;
+  }
+  var focalX = (0.5 - fx) * dw;
+  var focalY = (0.5 - fy) * dh;
+  var totalX = focalX + ox;
+  var totalY = focalY + oy;
+  var maxX = Math.max(0, (dw - rect.w) / 2);
+  var maxY = Math.max(0, (dh - rect.h) / 2);
+  totalX = clamp(totalX, -maxX, maxX);
+  totalY = clamp(totalY, -maxY, maxY);
+  var drawX = cx - dw / 2 + totalX;
+  var drawY = cy - dh / 2 + totalY;
+  ctx.save();
+  rectPath(ctx, rect);
+  ctx.clip();
+  ctx.translate(cx, cy);
+  ctx.rotate((panel.tilt * Math.PI) / 180);
+  ctx.translate(-cx, -cy);
+  ctx.drawImage(img, drawX, drawY, dw, dh);
   ctx.restore();
 }
 
-function drawCover(ctx, sizeKey) {
-  const size = SIZES[sizeKey];
-  const L = layoutToDraw(sizeKey);
-  const W = size.w;
-  const H = size.h;
-
-  // Sunset backdrop, only visible where a panel fails to load.
-  const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, "#1b1035");
-  bg.addColorStop(0.45, "#4b1560");
-  bg.addColorStop(0.75, "#b81e6e");
-  bg.addColorStop(1, "#ff7a18");
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, W, H);
-
-  // Four panels in the aspect-specific layout, full-bleed.
-  for (let i = 0; i < 4; i++) {
-    drawPanel(ctx, state.panels[i], L.rects[i]);
+function drawCover(ctx, layout) {
+  var size = SIZES[state.size];
+  var grad = ctx.createLinearGradient(0, 0, 0, size.h);
+  grad.addColorStop(0, "#1b1035");
+  grad.addColorStop(0.45, "#4b1560");
+  grad.addColorStop(0.75, "#b81e6e");
+  grad.addColorStop(1, "#ff7a18");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size.w, size.h);
+  for (var i = 0; i < 4; i++) {
+    drawPanel(ctx, layout.rects[i], state.panels[i]);
   }
-
-  // The only text on the cover: the title, overlaid on the hero with
-  // a dark scrim behind it so it stays readable over any scene.
-  const g = ctx.createLinearGradient(0, 0, 0, L.title.scrim);
-  g.addColorStop(0, "rgba(10, 5, 25, 0.78)");
-  g.addColorStop(1, "rgba(10, 5, 25, 0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, L.title.scrim);
+  var t = layout.title;
+  var scrim = ctx.createLinearGradient(0, 0, 0, t.scrim);
+  scrim.addColorStop(0, "rgba(10, 5, 25, 0.78)");
+  scrim.addColorStop(1, "rgba(10, 5, 25, 0)");
+  ctx.fillStyle = scrim;
+  ctx.fillRect(0, 0, size.w, t.scrim);
   ctx.save();
-  ctx.font = L.title.size + 'px "Anton", "Trebuchet MS", sans-serif';
+  ctx.font = t.size + 'px "Anton", "Trebuchet MS", sans-serif';
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.shadowColor = "rgba(255, 46, 136, 0.9)";
@@ -288,260 +211,399 @@ function drawCover(ctx, sizeKey) {
   ctx.shadowOffsetX = 4;
   ctx.shadowOffsetY = 4;
   ctx.fillStyle = "#ffffff";
-  ctx.fillText(state.title, L.title.x, L.title.y);
+  ctx.fillText(state.title, t.x, t.y);
   ctx.restore();
 }
 
+function drawCoverForSize(ctx, sizeKey) {
+  var savedSize = state.size;
+  state.size = sizeKey;
+  var size = SIZES[sizeKey];
+  var layout = layoutFor(sizeKey);
+  var grad = ctx.createLinearGradient(0, 0, 0, size.h);
+  grad.addColorStop(0, "#1b1035");
+  grad.addColorStop(0.45, "#4b1560");
+  grad.addColorStop(0.75, "#b81e6e");
+  grad.addColorStop(1, "#ff7a18");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size.w, size.h);
+  for (var i = 0; i < 4; i++) {
+    drawPanel(ctx, layout.rects[i], state.panels[i]);
+  }
+  var t = layout.title;
+  var scrim = ctx.createLinearGradient(0, 0, 0, t.scrim);
+  scrim.addColorStop(0, "rgba(10, 5, 25, 0.78)");
+  scrim.addColorStop(1, "rgba(10, 5, 25, 0)");
+  ctx.fillStyle = scrim;
+  ctx.fillRect(0, 0, size.w, t.scrim);
+  ctx.save();
+  ctx.font = t.size + 'px "Anton", "Trebuchet MS", sans-serif';
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.shadowColor = "rgba(255, 46, 136, 0.9)";
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 4;
+  ctx.shadowOffsetY = 4;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(state.title, t.x, t.y);
+  ctx.restore();
+  state.size = savedSize;
+}
+
 function renderPreview() {
-  const canvas = document.getElementById("cover");
-  const size = SIZES[state.size];
+  var canvas = document.getElementById("cover");
+  if (!canvas) { return; }
+  var size = SIZES[state.size];
   canvas.width = size.w;
   canvas.height = size.h;
-  const ctx = canvas.getContext("2d");
-  drawCover(ctx, state.size);
+  var ctx = canvas.getContext("2d");
+  drawCover(ctx, layoutToDraw());
+}
+
+function downloadCanvas(canvas, name) {
+  var a = document.createElement("a");
+  a.href = canvas.toDataURL("image/png");
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 function exportPNG(sizeKey) {
-  const size = SIZES[sizeKey];
-  const off = document.createElement("canvas");
+  var key = sizeKey || state.size;
+  var size = SIZES[key];
+  if (!size) { return; }
+  var off = document.createElement("canvas");
   off.width = size.w;
   off.height = size.h;
-  drawCover(off.getContext("2d"), sizeKey);
-  return new Promise((resolve) => off.toBlob((b) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.readAsDataURL(b);
-  }, "image/png"));
+  var ctx = off.getContext("2d");
+  drawCoverForSize(ctx, key);
+  downloadCanvas(off, "neon-coast-" + key + ".png");
 }
 
-function downloadPNG(sizeKey) {
-  exportPNG(sizeKey).then((url) => {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "neon-coast-" + sizeKey + ".png";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+function loadImage(src) {
+  return new Promise(function (resolve) {
+    var img = new Image();
+    img.onload = function () { resolve(img); };
+    img.onerror = function () { resolve(null); };
+    img.src = src;
   });
 }
 
+function setPanelImage(index, dataUrl) {
+  return loadImage(dataUrl).then(function (img) {
+    var panel = state.panels[index];
+    if (!panel) { return; }
+    if (img) {
+      panel.image = img;
+      panel.loaded = true;
+    } else {
+      panel.image = null;
+      panel.loaded = false;
+    }
+    panel.zoom = 1;
+    panel.ox = 0;
+    panel.oy = 0;
+    panel.fx = 0.5;
+    panel.fy = SAMPLES[index].fy;
+    panel.tilt = 0;
+    var slot = document.querySelectorAll(".slot")[index];
+    if (slot) {
+      var preview = slot.querySelector("img");
+      if (preview && img) { preview.src = dataUrl; }
+      var slider = slot.querySelector('input[type="range"]');
+      if (slider) { slider.value = "1"; }
+    }
+    renderPreview();
+  });
+}
+
+function probePanels() {
+  var size = SIZES[state.size];
+  var layout = layoutToDraw();
+  var off = document.createElement("canvas");
+  off.width = size.w;
+  off.height = size.h;
+  var ctx = off.getContext("2d");
+  drawCover(ctx, layout);
+  var out = [];
+  for (var i = 0; i < 4; i++) {
+    var r = layout.rects[i];
+    var px = Math.floor(r.x + r.w / 2);
+    var py = Math.floor(r.y + r.h / 2 - 10);
+    px = clamp(px, 0, size.w - 1);
+    py = clamp(py, 0, size.h - 1);
+    var d = ctx.getImageData(px, py, 1, 1).data;
+    out.push({ r: d[0], g: d[1], b: d[2] });
+  }
+  return out;
+}
+
 function buildSlots() {
-  const host = document.getElementById("slots");
-  state.panels.forEach((p, i) => {
-    const card = document.createElement("div");
+  var host = document.getElementById("slots");
+  if (!host) { return; }
+  host.innerHTML = "";
+  state.panels.forEach(function (panel, index) {
+    var card = document.createElement("div");
     card.className = "slot";
-    card.innerHTML =
-      '<div class="slot-head"><strong>Snapshot ' + (i + 1) + '</strong>' +
-      '<span>fills panel ' + (i + 1) + ' &mdash; ' + p.label + '</span></div>' +
-      '<img alt="Snapshot ' + (i + 1) + ' preview">' +
-      '<input type="file" accept="image/*" aria-label="Upload snapshot ' + (i + 1) + '">' +
-      '<div class="slot-controls">' +
-      '<button type="button" class="ghost tilt-btn" data-tilt="-1.5">&orarr; -1.5&deg;</button>' +
-      '<button type="button" class="ghost tilt-btn" data-tilt="0">0&deg;</button>' +
-      '<button type="button" class="ghost tilt-btn" data-tilt="1.5">+1.5&deg;</button>' +
-      '<input type="range" min="1" max="3" step="0.05" value="1" aria-label="Zoom snapshot ' + (i + 1) + '">' +
-      '<button type="button" class="ghost reset-btn">Reset crop</button>' +
-      '</div>';
-    const img = card.querySelector("img");
-    img.src = p.file;
-    const fileInput = card.querySelector('input[type="file"]');
-    fileInput.addEventListener("change", () => {
-      const file = fileInput.files && fileInput.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        loadImage(reader.result).then((im) => {
-          p.img = im;
-          p.loaded = true;
-          p.zoom = 1; p.ox = 0; p.oy = 0;
-          p.fx = 0.5; p.fy = 0.5;
-          img.src = reader.result;
-          renderPreview();
-        });
+    var head = document.createElement("div");
+    head.className = "slot-head";
+    var strong = document.createElement("strong");
+    strong.textContent = "Snapshot " + (index + 1);
+    var span = document.createElement("span");
+    span.textContent = "fills panel " + (index + 1) + " \u2014 " + panel.label;
+    head.appendChild(strong);
+    head.appendChild(span);
+    card.appendChild(head);
+    var img = document.createElement("img");
+    img.alt = panel.label;
+    img.src = panel.file;
+    card.appendChild(img);
+    var fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "image/*";
+    fileInput.addEventListener("change", function () {
+      var file = fileInput.files && fileInput.files[0];
+      if (!file) { return; }
+      var reader = new FileReader();
+      reader.onload = function () {
+        setPanelImage(index, String(reader.result));
       };
       reader.readAsDataURL(file);
     });
-    card.querySelectorAll(".tilt-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        p.tilt = parseFloat(btn.dataset.tilt || "0");
+    card.appendChild(fileInput);
+    var controls = document.createElement("div");
+    controls.className = "slot-controls";
+    var tilts = [-1.5, 0, 1.5];
+    tilts.forEach(function (deg) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "ghost";
+      b.textContent = deg === 0 ? "0\u00b0" : (deg > 0 ? "+" : "") + deg + "\u00b0";
+      b.addEventListener("click", function () {
+        panel.tilt = deg;
         renderPreview();
       });
+      controls.appendChild(b);
     });
-    const zoom = card.querySelector('input[type="range"]');
-    zoom.addEventListener("input", () => {
-      p.zoom = parseFloat(zoom.value);
+    var slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = "1";
+    slider.max = "3";
+    slider.step = "0.05";
+    slider.value = "1";
+    slider.setAttribute("aria-label", "Zoom panel " + (index + 1));
+    slider.addEventListener("input", function () {
+      panel.zoom = parseFloat(slider.value);
       renderPreview();
     });
-    card.querySelector(".reset-btn").addEventListener("click", () => {
-      p.zoom = 1; p.ox = 0; p.oy = 0; p.tilt = 0;
-      zoom.value = "1";
+    controls.appendChild(slider);
+    var reset = document.createElement("button");
+    reset.type = "button";
+    reset.className = "ghost";
+    reset.textContent = "Reset crop";
+    reset.addEventListener("click", function () {
+      panel.zoom = 1;
+      panel.ox = 0;
+      panel.oy = 0;
+      panel.tilt = 0;
+      slider.value = "1";
       renderPreview();
     });
+    controls.appendChild(reset);
+    card.appendChild(controls);
     host.appendChild(card);
   });
 }
 
-function canvasPoint(evt) {
-  const canvas = document.getElementById("cover");
-  const r = canvas.getBoundingClientRect();
-  return {
-    x: ((evt.clientX - r.left) / r.width) * canvas.width,
-    y: ((evt.clientY - r.top) / r.height) * canvas.height,
-  };
-}
-
-function hitPanel(pt) {
-  const L = layoutToDraw(state.size);
-  for (let i = 0; i < 4; i++) {
-    const rc = L.rects[i];
-    if (pt.y < rc.y || pt.y > rc.y + rc.h) continue;
-    // A slanted rect is a parallelogram: at height t the strip spans
-    // from left = x + slant*(1 - 2t) to right = x + w + slant*(1 - 2t).
-    let left = rc.x;
-    let right = rc.x + rc.w;
-    if (rc.slant) {
-      const t = (pt.y - rc.y) / rc.h;
-      const lean = rc.slant * (1 - 2 * t);
-      left = rc.x + lean;
-      right = rc.x + rc.w + lean;
-    }
-    if (pt.x >= left && pt.x <= right) {
-      const onStrip = pt.y >= rc.y + rc.h - L.strip;
-      return { index: i, onStrip, rect: rc };
-    }
-  }
-  return null;
-}
-
-function bindPointer() {
-  const canvas = document.getElementById("cover");
-  let drag = null;
-  canvas.addEventListener("pointerdown", (evt) => {
-    const hit = hitPanel(canvasPoint(evt));
-    if (!hit) return;
-    canvas.setPointerCapture(evt.pointerId);
-    drag = {
-      index: hit.index, onStrip: hit.onStrip,
-      startX: evt.clientX, startY: evt.clientY,
-      moved: false, ox: state.panels[hit.index].ox, oy: state.panels[hit.index].oy,
+function bindCanvas() {
+  var canvas = document.getElementById("cover");
+  if (!canvas) { return; }
+  var drag = null;
+  function toCanvas(e) {
+    var rect = canvas.getBoundingClientRect();
+    var scaleX = canvas.width / rect.width;
+    var scaleY = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+      scaleX: scaleX,
+      scaleY: scaleY,
     };
+  }
+  canvas.addEventListener("pointerdown", function (e) {
+    var p = toCanvas(e);
+    var layout = layoutToDraw();
+    var idx = hitPanel(layout, p.x, p.y);
+    if (idx < 0) { return; }
+    var r = layout.rects[idx];
+    var fromStrip = p.y > r.y + r.h - layout.strip * p.scaleY;
+    drag = {
+      index: idx,
+      startX: p.x,
+      startY: p.y,
+      lastX: p.x,
+      lastY: p.y,
+      fromStrip: fromStrip,
+      moved: false,
+    };
+    canvas.setPointerCapture(e.pointerId);
   });
-  canvas.addEventListener("pointermove", (evt) => {
-    if (!drag) return;
-    const rect = canvas.getBoundingClientRect();
-    const sx = canvas.width / rect.width;
-    const sy = canvas.height / rect.height;
-    const dx = (evt.clientX - drag.startX) * sx;
-    const dy = (evt.clientY - drag.startY) * sy;
-    if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
-    if (!drag.onStrip) {
-      // Drag the photo inside its frame: pan the crop.
-      const p = state.panels[drag.index];
-      p.ox = drag.ox + dx;
-      p.oy = drag.oy + dy;
+  canvas.addEventListener("pointermove", function (e) {
+    if (!drag) { return; }
+    var p = toCanvas(e);
+    var dx = p.x - drag.lastX;
+    var dy = p.y - drag.lastY;
+    if (Math.abs(p.x - drag.startX) + Math.abs(p.y - drag.startY) > 4) {
+      drag.moved = true;
+    }
+    if (!drag.fromStrip && drag.moved) {
+      var panel = state.panels[drag.index];
+      panel.ox += dx;
+      panel.oy += dy;
+      drag.lastX = p.x;
+      drag.lastY = p.y;
       renderPreview();
     }
   });
-  canvas.addEventListener("pointerup", (evt) => {
-    if (!drag) return;
-    if (drag.onStrip && drag.moved) {
-      // Drag the panel by its label bar: swap it with the panel under the pointer.
-      const hit = hitPanel(canvasPoint(evt));
-      if (hit && hit.index !== drag.index) {
-        const tmp = state.panels[drag.index];
-        state.panels[drag.index] = state.panels[hit.index];
-        state.panels[hit.index] = tmp;
-        buildSlotsRefresh();
+  canvas.addEventListener("pointerup", function (e) {
+    if (!drag) { return; }
+    var p = toCanvas(e);
+    var layout = layoutToDraw();
+    if (drag.fromStrip && drag.moved) {
+      var target = hitPanel(layout, p.x, p.y);
+      if (target >= 0 && target !== drag.index) {
+        var tmp = state.panels[drag.index];
+        state.panels[drag.index] = state.panels[target];
+        state.panels[target] = tmp;
+        buildSlots();
       }
     }
     drag = null;
     renderPreview();
   });
-  canvas.addEventListener("wheel", (evt) => {
-    const hit = hitPanel(canvasPoint(evt));
-    if (!hit) return;
-    evt.preventDefault();
-    const p = state.panels[hit.index];
-    p.zoom = Math.max(1, Math.min(3, p.zoom * (evt.deltaY < 0 ? 1.08 : 0.93)));
+  canvas.addEventListener("wheel", function (e) {
+    e.preventDefault();
+    var p = toCanvas(e);
+    var layout = layoutToDraw();
+    var idx = hitPanel(layout, p.x, p.y);
+    if (idx < 0) { return; }
+    var panel = state.panels[idx];
+    var factor = e.deltaY < 0 ? 1.08 : 0.93;
+    panel.zoom = clamp(panel.zoom * factor, 1, 3);
+    var slot = document.querySelectorAll(".slot")[idx];
+    if (slot) {
+      var slider = slot.querySelector('input[type="range"]');
+      if (slider) { slider.value = String(panel.zoom); }
+    }
     renderPreview();
   }, { passive: false });
 }
 
-function buildSlotsRefresh() {
-  const host = document.getElementById("slots");
-  host.innerHTML = "";
-  buildSlots();
-}
-
-function bindControls() {
-  document.querySelectorAll(".size-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".size-btn").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      state.size = btn.dataset.size || "landscape";
+function bindUI() {
+  var sizeButtons = document.querySelectorAll("[data-size]");
+  sizeButtons.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var key = btn.getAttribute("data-size");
+      if (!SIZES[key]) { return; }
+      state.size = key;
+      sizeButtons.forEach(function (b) {
+        b.classList.toggle("active", b === btn);
+      });
       renderPreview();
     });
   });
-  document.getElementById("title-input").addEventListener("input", (e) => {
-    state.title = e.target.value.toUpperCase();
-    renderPreview();
-  });
-  document.getElementById("export-one").addEventListener("click", () => downloadPNG(state.size));
-  document.getElementById("export-all").addEventListener("click", () => {
-    ["landscape", "portrait", "square"].forEach((k, i) => {
-      setTimeout(() => downloadPNG(k), i * 250);
+  var one = document.getElementById("export-one");
+  if (one) {
+    one.addEventListener("click", function () { exportPNG(state.size); });
+  }
+  var all = document.getElementById("export-all");
+  if (all) {
+    all.addEventListener("click", function () {
+      var keys = ["landscape", "portrait", "square"];
+      keys.forEach(function (key, i) {
+        setTimeout(function () { exportPNG(key); }, i * 250);
+      });
     });
-  });
+  }
+  var titleInput = document.getElementById("title-input");
+  if (titleInput) {
+    titleInput.addEventListener("input", function () {
+      state.title = titleInput.value.toUpperCase();
+      renderPreview();
+    });
+  }
 }
 
-// Test hooks used by the headless verification pass. They only read or
-// replace panel images through the same code paths as the UI.
-window.__cover = {
-  state,
-  layoutFor,
-  diagonalLayout,
-  layoutToDraw,
-  exportPNG,
-  renderPreview,
-  async setPanelImage(index, dataUrl) {
-    const p = state.panels[index];
-    p.img = await loadImage(dataUrl);
-    p.loaded = true;
-    p.zoom = 1; p.ox = 0; p.oy = 0;
-    renderPreview();
-  },
-  probePanels(sizeKey) {
-    const size = SIZES[sizeKey];
-    const off = document.createElement("canvas");
-    off.width = size.w;
-    off.height = size.h;
-    const ctx = off.getContext("2d");
-    drawCover(ctx, sizeKey);
-    const L = layoutToDraw(sizeKey);
-    return L.rects.map((rc) => {
-      const d = ctx.getImageData(
-        Math.floor(rc.x + rc.w / 2), Math.floor(rc.y + rc.h / 2 - 10), 1, 1).data;
-      return { r: d[0], g: d[1], b: d[2] };
+function init() {
+  var params = new URLSearchParams(window.location.search);
+  var sizeParam = params.get("size");
+  if (sizeParam && SIZES[sizeParam]) {
+    state.size = sizeParam;
+  }
+  if (params.get("layout") === "diagonal") {
+    state.layoutOverride = "diagonal";
+  }
+  if (params.get("scene") === "cover") {
+    document.body.classList.add("scene-cover");
+  }
+  var sizeButtons = document.querySelectorAll("[data-size]");
+  sizeButtons.forEach(function (b) {
+    b.classList.toggle("active", b.getAttribute("data-size") === state.size);
+  });
+  var titleInput = document.getElementById("title-input");
+  if (titleInput) {
+    titleInput.value = state.title;
+  }
+  buildSlots();
+  bindUI();
+  bindCanvas();
+  var loads = state.panels.map(function (panel) {
+    return loadImage(panel.file).then(function (img) {
+      if (img) {
+        panel.image = img;
+        panel.loaded = true;
+      } else {
+        panel.image = null;
+        panel.loaded = false;
+      }
     });
-  },
+  });
+  var fontLoad = Promise.resolve();
+  try {
+    if (document.fonts && document.fonts.load) {
+      fontLoad = Promise.all([
+        document.fonts.load('140px "Anton"'),
+        document.fonts.load('84px "Anton"'),
+      ]).then(function () { return document.fonts.ready; }).catch(function () { return null; });
+    }
+  } catch (err) {
+    fontLoad = Promise.resolve();
+  }
+  Promise.all(loads.concat([fontLoad])).then(function () {
+    renderPreview();
+    document.body.setAttribute("data-ready", "ready");
+  });
+  renderPreview();
+}
+
+diagonalLayout.rects = diagonalLayout().rects;
+diagonalLayout.title = diagonalLayout().title;
+diagonalLayout.strip = diagonalLayout().strip;
+
+window.__cover = {
+  state: state,
+  layoutFor: layoutFor,
+  diagonalLayout: diagonalLayout,
+  layoutToDraw: layoutToDraw,
+  exportPNG: exportPNG,
+  renderPreview: renderPreview,
+  setPanelImage: setPanelImage,
+  probePanels: probePanels,
 };
 
-async function init() {
-  const params = new URLSearchParams(window.location.search);
-  const scene = params.get("scene") || "editor";
-  const sizeParam = params.get("size");
-  if (sizeParam && SIZES[sizeParam]) state.size = sizeParam;
-  if (params.get("layout") === "diagonal") state.layoutOverride = "diagonal";
-  if (scene === "cover") document.body.classList.add("scene-cover");
-  await loadSamples();
-  await ensureFonts();
-  if (scene !== "cover") {
-    buildSlots();
-    bindPointer();
-    bindControls();
-  }
-  renderPreview();
-  document.body.dataset.ready = "ready";
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
 }
-
-init();

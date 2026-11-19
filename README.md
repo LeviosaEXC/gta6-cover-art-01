@@ -1,90 +1,69 @@
-# Neon Coast — GTA-style Cover Maker
+# NEON COAST — GTA-style Cover Maker
 
-[![Competition](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/c/gta6-cover-art-01)
-[![Rank](https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/rank.svg)](https://make.fun/c/gta6-cover-art-01)
-[![Reward](https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/reward.svg)](https://make.fun/c/gta6-cover-art-01)
+[![gta6-cover-art-01](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/)
+[![rank](https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/rank.svg)](https://make.fun/)
+[![reward](https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/reward.svg)](https://make.fun/)
 
-Entry for [gta6-cover-art-01](https://make.fun/c/gta6-cover-art-01) — "Make GTA 6 Cover Art".
+A static, offline GTA-style cover maker for the **gta6-cover-art-01** competition.
+Four illustrated photo panels plus the title only — "NEON COAST" — with three
+export sizes and one extra diagonal landscape render.
 
-## What it is
+## The cover
 
-A fully offline cover-art maker. Load your own photos (or use the four bundled
-illustrated samples), arrange them in a per-aspect layout telling one coastal-city
-action story, edit the title, and export a PNG cover in
-three sizes: landscape 1920×1080, portrait 1080×1350, and square 1080×1080.
+Four scenes from one neon coastal city, in a full-bleed digital-painting style:
 
-## Final (submit #2) — per-orientation layouts + Anton
+1. **Boulevard Chase** — neon boulevard, the getaway (hero panel)
+2. **Boardwalk Lights** — ferris wheel over the pier
+3. **Heist Standoff** — heist vs police, the standoff
+4. **Night Skate** — skateboard under neon
 
-Each aspect gets its own composition, all full-bleed edge to edge with no
-margins, no gutters and no per-panel names. The only text on the cover is
-the title "NEON COAST", overlaid in Anton — the bold condensed OFL display
-font that replaces the rejected Alfa Slab One (removed entirely: font file,
-license text and every reference). The drawn sun, the tagline and the bottom
-caption from V4 are gone; panel swapping now works by dragging a panel by
-its bottom edge (the handle is invisible, so the cover stays clean).
+Each orientation gets its own layout, tuned so the printed titles on the source
+posters stay out of frame while the action stays centred:
 
-- **Landscape 1920×1080 — V1 hero-dominant:** one big boulevard panel on
-  the left (60% of the width, full height) with the other three panels
-  stacked on the right.
-- **Portrait 1080×1350 — hero on top:** one big boulevard panel on top
-  (60% of the height) with the other three panels in a row below.
-- **Square 1080×1080 — banner:** the boulevard hero spans the full width
-  on top (55% of the height), with the other three panels in a row below.
+- **Landscape 1920 x 1080** — hero-dominant: the hero fills the left 1152 px,
+  the other three panels stack on the right.
+- **Portrait 1080 x 1350** — hero on top (1080 x 810), three panels below.
+- **Square 1080 x 1080** — banner: the hero spans the top 55%, three panels
+  below.
+- **Diagonal landscape** — a separate render (`?layout=diagonal`): four
+  slanted full-height strips, 480 px wide, slant 60.
 
-A fourth render, the **V3 diagonal** (four full-height slanted strips side
-by side at landscape size, leaning right at the top, with sunset-gradient
-wedges in the outer corners), is available on the cover page with
-`?layout=diagonal` and is captured as screenshot 03 — it is not an export
-size; the app still exports the three standard sizes above.
+The only text drawn on the cover is the title itself, set in Anton over a dark
+scrim. No panel names, no logos, no official artwork.
 
-## V4 — what changed from V3
+## Use it
 
-V3 ("Neon Coast Collage") scored a 65.09% provisional: it read like a vacation
-scrapbook, the portrait and square exports collided, and photo slots 3 and 4
-were never used. V4 fixes all three, following the advisor diagnosis:
+Open `app/index.html` in a browser. No server and no network needed — every
+asset (photos, fonts) is local.
 
-1. **Art direction** — an illustrated 2×2 grid (bold outlines, flat sunset/neon
-   colors) with one dominant hero panel, instead of a tilted scrapbook collage.
-   No star-rating badge, no Polaroid dressing. Original lettering only.
-2. **Aspect-specific compositions** — separate safe-area layouts for landscape,
-   portrait and square. Nothing is clipped or stacked at any size.
-3. **Four real photo slots** — snapshot 1 fills panel 1, 2 fills panel 2, 3 fills
-   panel 3, 4 fills panel 4. Drag the photo inside its frame to pan the crop,
-   scroll to zoom, drag a panel by its label bar to swap panels, tilt buttons
-   rotate a panel. The instruction text now matches the actual controls.
+- Pick a size: Landscape, Portrait, or Square.
+- **Export PNG (this size)** downloads the current size; **Export all 3 sizes**
+  downloads all three.
+- Each Snapshot card fills its own panel. Upload a photo to replace one, drag
+  inside the photo to pan its crop, scroll over it to zoom, use the tilt
+  buttons to rotate it, or hit **Reset crop**.
+- Drag a panel by its bottom edge onto another panel to swap the two panels.
+- Edit the **Cover title** field to change the title (uppercased automatically).
 
-## How to use
+Query parameters:
 
-1. Open `app/index.html` in a browser (no server, no network needed).
-2. Upload up to four snapshots, or keep the bundled illustrated samples.
-3. Drag inside a photo to pan its crop, scroll over it to zoom, use the tilt
-   buttons to rotate the panel, drag a panel by its bottom edge to swap it.
-4. Edit the title.
-5. Pick a size and hit **Export PNG**, or **Export all 3 sizes**.
+- `?size=portrait` (or `landscape` / `square`) — start on that size.
+- `?layout=diagonal` — render the diagonal landscape layout.
+- `?scene=cover` — hide the editor and show only the cover.
 
 ## Verify
+
+Run the deterministic bundle verifier from the repo root:
 
 ```sh
 node main.ts
 ```
 
-`main.ts` (Node 22+, stdlib only, no network) checks the bundle — all files
-present, no network/eval references in the app, SPDX license line, the three
-README badges, the owner wallet, four distinct samples, the OFL license
-texts, the font swap (Anton present and referenced, Alfa Slab One fully
-gone), and the three per-orientation layouts (V1 hero landscape, hero-top
-portrait, banner square) plus the diagonal landscape render — then prints a
-deterministic JSON report. Run it twice: the output is
-byte-identical.
+It runs 32 checks (all files present, offline, licence, README badges, owner
+wallet, distinct samples, font licences, Anton-only fonts, and the four layout
+snippets) and exits 0 when all 32 pass.
 
-## Files
+## Fonts and licence
 
-- `app/index.html`, `app/app.js`, `app/styles.css` — the maker (static, offline).
-- `app/samples/` — four illustrated sample scenes in the cover-art style.
-- `app/fonts/` — Anton (title) and Caveat under the SIL Open Font License 1.1
-  (license texts shipped beside the font files).
-- `main.ts` — deterministic bundle verifier.
-- `LICENSE` — MIT.
-
-All lettering is original. No official logos, artwork, or fonts from the
-referenced game are used.
+Display font Anton under the SIL Open Font License 1.1 — see `app/fonts/`.
+Original lettering and art direction. No official logos or artwork.

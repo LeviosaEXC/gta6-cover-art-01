@@ -1,20 +1,10 @@
-// main.ts — gta6-cover-art-01 "Neon Coast" cover maker (final).
-// Deterministic bundle verifier. Node 22+, stdlib only, no network.
-// Usage: node main.ts
-// Prints a sorted JSON report of every bundle check to stdout and exits
-// 0 when all checks pass, 1 otherwise. Running it twice produces
-// byte-identical output: no timestamps, no random values, sorted keys.
+const fs = require("node:fs");
+const path = require("node:path");
+const crypto = require("node:crypto");
 
-import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+const root = __dirname;
 
-type Check = { name: string; ok: boolean; detail: string };
-
-const ROOT = process.cwd();
-const WALLET = "3yBDPgQMqvpj4cH7bAcrzw2Y9JcjsG4MfKAhrgvmMtp3";
-
-const APP_FILES: string[] = [
+const appFiles = [
   "app/index.html",
   "app/app.js",
   "app/styles.css",
@@ -28,196 +18,198 @@ const APP_FILES: string[] = [
   "app/samples/sample4-skate.jpg",
 ];
 
-const REPO_FILES: string[] = [
+const repoFiles = [
   "LICENSE",
   "README.md",
   ".makefun/owner.json",
   "main.ts",
 ];
 
-const FORBIDDEN_IN_APP: RegExp[] = [
-  /https?:\/\//,
-  /eval\s*\(/,
-  /new\s+Function\s*\(/,
-  /serviceWorker/,
-  /document\.cookie/,
-  /XMLHttpRequest/,
-  /fetch\s*\(/,
-  /WebSocket/,
+const allFiles = appFiles.concat(repoFiles).sort();
+
+function sha256(filePath) {
+  const data = fs.readFileSync(filePath);
+  return crypto.createHash("sha256").update(data).digest("hex");
+}
+
+function isFile(rel) {
+  try {
+    return fs.statSync(path.join(root, rel)).isFile();
+  } catch (e) {
+    return false;
+  }
+}
+
+function readText(rel) {
+  return fs.readFileSync(path.join(root, rel), "utf8");
+}
+
+const checks = [];
+
+function addCheck(name, passed, detail) {
+  checks.push({ name: name, passed: passed, detail: detail });
+}
+
+for (const rel of allFiles) {
+  if (isFile(rel)) {
+    const size = fs.statSync(path.join(root, rel)).size;
+    addCheck("exists:" + rel, true, String(size) + " bytes");
+  } else {
+    addCheck("exists:" + rel, false, "missing");
+  }
+}
+
+const forbidden = [
+  "http://",
+  "https://",
+  "eval",
+  "new Function",
+  "serviceWorker",
+  "document.cookie",
+  "XMLHttpRequest",
+  "fetch",
+  "WebSocket",
 ];
 
-function sha256(path: string): string {
-  const data = readFileSync(path);
-  return createHash("sha256").update(data).digest("hex");
-}
-
-function readText(path: string): string {
-  return readFileSync(path, "utf8");
-}
-
-function checkFilesExist(files: string[], checks: Check[]): void {
-  for (const rel of files) {
-    const full = join(ROOT, rel);
-    const ok = existsSync(full) && statSync(full).isFile();
-    checks.push({
-      name: "exists:" + rel,
-      ok,
-      detail: ok ? "present, " + statSync(full).size + " bytes" : "missing",
-    });
+for (const rel of ["app/index.html", "app/app.js", "app/styles.css"]) {
+  if (!isFile(rel)) {
+    addCheck("offline:" + rel, false, "missing");
+    continue;
+  }
+  const text = readText(rel);
+  const found = forbidden.filter(function (p) { return text.indexOf(p) !== -1; });
+  if (found.length === 0) {
+    addCheck("offline:" + rel, true, "no network/eval refs");
+  } else {
+    addCheck("offline:" + rel, false, "found: " + found.join(", "));
   }
 }
 
-function checkNoNetworkInApp(checks: Check[]): void {
-  const textFiles = ["app/index.html", "app/app.js", "app/styles.css"];
-  for (const rel of textFiles) {
-    const body = readText(join(ROOT, rel));
-    const hits: string[] = [];
-    for (const re of FORBIDDEN_IN_APP) {
-      if (re.test(body)) hits.push(String(re));
-    }
-    checks.push({
-      name: "offline:" + rel,
-      ok: hits.length === 0,
-      detail: hits.length === 0 ? "no network/eval refs" : "forbidden: " + hits.join(", "),
-    });
+if (isFile("LICENSE")) {
+  const first = readText("LICENSE").split("\n")[0].trim();
+  addCheck("license:spdx-first-line", first === "SPDX-License-Identifier: MIT", first);
+} else {
+  addCheck("license:spdx-first-line", false, "missing");
+}
+
+const badges = [
+  ["competition", "https://make.fun/badge/gta6-cover-art-01.svg"],
+  ["rank", "https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/rank.svg"],
+  ["reward", "https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/reward.svg"],
+];
+
+for (const pair of badges) {
+  const label = pair[0];
+  const url = pair[1];
+  const fileName = url.split("/").pop();
+  if (!isFile("README.md")) {
+    addCheck("readme:badge:" + fileName, false, "missing README");
+    continue;
   }
+  const text = readText("README.md");
+  addCheck("readme:badge:" + fileName, text.indexOf(url) !== -1, url);
 }
 
-function checkLicense(checks: Check[]): void {
-  const first = readText(join(ROOT, "LICENSE")).split("\n")[0].trim();
-  checks.push({
-    name: "license:spdx-first-line",
-    ok: first === "SPDX-License-Identifier: MIT",
-    detail: "first line is: " + first,
-  });
-}
-
-function checkReadme(checks: Check[]): void {
-  const body = readText(join(ROOT, "README.md"));
-  const badges = [
-    "https://make.fun/badge/gta6-cover-art-01.svg",
-    "https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/rank.svg",
-    "https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/reward.svg",
-  ];
-  for (const badge of badges) {
-    checks.push({
-      name: "readme:badge:" + badge.split("/").pop(),
-      ok: body.includes(badge),
-      detail: body.includes(badge) ? "badge present" : "badge missing",
-    });
-  }
-}
-
-function checkOwner(checks: Check[]): void {
-  const raw = readText(join(ROOT, ".makefun/owner.json"));
-  let parsed: { wallet?: string } = {};
+if (isFile(".makefun/owner.json")) {
+  let ok = false;
+  let detail = "unparsable";
   try {
-    parsed = JSON.parse(raw) as { wallet?: string };
-  } catch {
-    parsed = {};
+    const parsed = JSON.parse(readText(".makefun/owner.json"));
+    ok = parsed.wallet === "3yBDPgQMqvpj4cH7bAcrzw2Y9JcjsG4MfKAhrgvmMtp3";
+    detail = ok ? "wallet matches" : "wallet mismatch";
+  } catch (e) {
+    detail = "invalid JSON";
   }
-  checks.push({
-    name: "owner:wallet",
-    ok: parsed.wallet === WALLET,
-    detail: parsed.wallet === WALLET ? "agent wallet recorded" : "wallet mismatch",
-  });
+  addCheck("owner:wallet", ok, detail);
+} else {
+  addCheck("owner:wallet", false, "missing");
 }
 
-function checkSamplesDistinct(checks: Check[]): void {
-  const hashes = new Set<string>();
-  for (let i = 1; i <= 4; i++) {
-    hashes.add(sha256(join(ROOT, "app/samples/sample" + i + "-" +
-      ["hero", "ferris", "heist", "skate"][i - 1] + ".jpg")));
+const samplePaths = [
+  "app/samples/sample1-hero.jpg",
+  "app/samples/sample2-ferris.jpg",
+  "app/samples/sample3-heist.jpg",
+  "app/samples/sample4-skate.jpg",
+];
+if (samplePaths.every(isFile)) {
+  const hashes = samplePaths.map(function (p) { return sha256(path.join(root, p)); });
+  const distinct = new Set(hashes).size;
+  addCheck("samples:four-distinct", distinct === 4, String(distinct) + " distinct hashes");
+} else {
+  addCheck("samples:four-distinct", false, "missing sample");
+}
+
+const oflPhrases = [
+  "SIL OPEN FONT LICENSE",
+  "Version 1.1",
+  "Permission is hereby granted, free of charge",
+];
+for (const name of ["OFL-Anton.txt", "OFL-Caveat.txt"]) {
+  const rel = "app/fonts/" + name;
+  if (!isFile(rel)) {
+    addCheck("ofl:" + name, false, "missing");
+    continue;
   }
-  checks.push({
-    name: "samples:four-distinct",
-    ok: hashes.size === 4,
-    detail: hashes.size + " distinct sample images",
-  });
+  const text = readText(rel);
+  const missing = oflPhrases.filter(function (p) { return text.indexOf(p) === -1; });
+  addCheck("ofl:" + name, missing.length === 0, missing.length === 0 ? "all phrases present" : "missing: " + missing.join(", "));
 }
 
-function checkOfl(checks: Check[]): void {
-  for (const name of ["OFL-Anton.txt", "OFL-Caveat.txt"]) {
-    const body = readText(join(ROOT, "app/fonts/" + name));
-    const ok = body.includes("SIL OPEN FONT LICENSE") &&
-      body.includes("Version 1.1") &&
-      body.includes("Permission is hereby granted, free of charge");
-    checks.push({
-      name: "ofl:" + name,
-      ok,
-      detail: ok ? "OFL 1.1 text present" : "OFL text incomplete",
-    });
+const alfaAbsent = !isFile("app/fonts/AlfaSlabOne-Regular.ttf") && !isFile("app/fonts/OFL-AlfaSlabOne.txt");
+addCheck("fonts:alfa-absent", alfaAbsent, alfaAbsent ? "no Alfa Slab One files" : "Alfa Slab One file present");
+
+const appTextFiles = ["app/index.html", "app/app.js", "app/styles.css"];
+let antonOk = true;
+let antonDetail = "Anton present in all three app files, no Alfa refs";
+for (const rel of appTextFiles) {
+  if (!isFile(rel)) {
+    antonOk = false;
+    antonDetail = "missing " + rel;
+    break;
+  }
+  const text = readText(rel);
+  if (text.indexOf("Anton") === -1 || text.indexOf("Alfa") !== -1) {
+    antonOk = false;
+    antonDetail = "check failed in " + rel;
+    break;
+  }
+}
+addCheck("fonts:anton-in-app", antonOk, antonDetail);
+
+const layoutSnippets = [
+  ["layouts:landscape-v1-hero", "w: 1152, h: 1080"],
+  ["layouts:portrait-hero-top", "w: 1080, h: 810"],
+  ["layouts:square-banner", "w: 1080, h: 594"],
+  ["layouts:diagonal-landscape", "slant: 60"],
+];
+const appJs = isFile("app/app.js") ? readText("app/app.js") : "";
+for (const pair of layoutSnippets) {
+  addCheck(pair[0], appJs.indexOf(pair[1]) !== -1, pair[1]);
+}
+
+checks.sort(function (a, b) {
+  if (a.name < b.name) { return -1; }
+  if (a.name > b.name) { return 1; }
+  return 0;
+});
+
+const files = {};
+for (const rel of allFiles) {
+  if (isFile(rel)) {
+    files[rel] = sha256(path.join(root, rel));
   }
 }
 
-function checkLayouts(checks: Check[]): void {
-  // The three per-orientation compositions plus the diagonal landscape
-  // render must be the ones in the app: V1 hero-dominant landscape,
-  // hero-on-top portrait, banner square, V3 diagonal landscape.
-  const src = readText(join(ROOT, "app/app.js"));
-  const cases: Array<[string, string, string]> = [
-    ["layouts:landscape-v1-hero", "w: 1152, h: 1080", "landscape hero rect missing"],
-    ["layouts:portrait-hero-top", "w: 1080, h: 810", "portrait hero rect missing"],
-    ["layouts:square-banner", "w: 1080, h: 594", "square banner hero missing"],
-    ["layouts:diagonal-landscape", "slant: 60", "diagonal landscape strips missing"],
-  ];
-  for (const [name, needle, detail] of cases) {
-    const ok = src.includes(needle);
-    checks.push({ name, ok, detail: ok ? needle : detail });
-  }
-}
+const passed = checks.filter(function (c) { return c.passed; }).length;
 
-function checkFontSwap(checks: Check[]): void {
-  // The rejected title font must be fully gone; the final title font
-  // (Anton) must be the one the app actually references.
-  const alfaGone =
-    !existsSync(join(ROOT, "app/fonts/AlfaSlabOne-Regular.ttf")) &&
-    !existsSync(join(ROOT, "app/fonts/OFL-AlfaSlabOne.txt"));
-  checks.push({
-    name: "fonts:alfa-absent",
-    ok: alfaGone,
-    detail: alfaGone ? "no Alfa Slab One files in the bundle" : "Alfa Slab One still present",
-  });
-  const appFiles = ["app/index.html", "app/app.js", "app/styles.css"];
-  const usesAnton = appFiles.every((rel) => readText(join(ROOT, rel)).includes("Anton"));
-  const noAlfa = appFiles.every((rel) => !readText(join(ROOT, rel)).includes("Alfa"));
-  checks.push({
-    name: "fonts:anton-in-app",
-    ok: usesAnton && noAlfa,
-    detail: usesAnton && noAlfa ? "Anton referenced, no Alfa references" : "font references wrong",
-  });
-}
+const report = {
+  bundle: "gta6-cover-art-01",
+  entry: "Neon Coast final (per-orientation layouts, Anton)",
+  checks: checks,
+  files: files,
+  passed: passed,
+  total: checks.length,
+};
 
-function main(): number {
-  const checks: Check[] = [];
-  checkFilesExist(APP_FILES, checks);
-  checkFilesExist(REPO_FILES, checks);
-  checkNoNetworkInApp(checks);
-  checkLicense(checks);
-  checkReadme(checks);
-  checkOwner(checks);
-  checkSamplesDistinct(checks);
-  checkOfl(checks);
-  checkFontSwap(checks);
-  checkLayouts(checks);
-
-  const files: Record<string, string> = {};
-  for (const rel of [...APP_FILES, ...REPO_FILES].sort()) {
-    const full = join(ROOT, rel);
-    if (existsSync(full)) files[rel] = sha256(full);
-  }
-
-  const passed = checks.filter((c) => c.ok).length;
-  const report = {
-    bundle: "gta6-cover-art-01",
-    entry: "Neon Coast final (per-orientation layouts, Anton)",
-    checks: checks.sort((a, b) => a.name.localeCompare(b.name)),
-    files,
-    passed,
-    total: checks.length,
-  };
-  process.stdout.write(JSON.stringify(report, null, 2) + "\n");
-  return passed === checks.length ? 0 : 1;
-}
-
-process.exit(main());
+process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+process.exit(passed === checks.length ? 0 : 1);
