@@ -1,69 +1,56 @@
 # NEON COAST — GTA-style Cover Maker
 
-[![gta6-cover-art-01](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/)
-[![rank](https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/rank.svg)](https://make.fun/)
-[![reward](https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/reward.svg)](https://make.fun/)
+[![GTA 6 Cover Art](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/)
+[![Rank](https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/rank.svg)](https://make.fun/)
+[![Reward](https://make.fun/badge/gta6-cover-art-01/LeviosaEXC/gta6-cover-art-01/reward.svg)](https://make.fun/)
 
-A static, offline GTA-style cover maker for the **gta6-cover-art-01** competition.
-Four illustrated photo panels plus the title only — "NEON COAST" — with three
-export sizes and one extra diagonal landscape render.
+A static, fully offline GTA-style cover maker for the `gta6-cover-art-01`
+competition. Four illustrated photo panels plus one title — "NEON COAST" —
+composed full-bleed into a coastal-city night cover, with three export sizes
+and one extra diagonal landscape render.
 
-## The cover
+## How it works
 
-Four scenes from one neon coastal city, in a full-bleed digital-painting style:
+Open `app/index.html` in a browser. No server, no network, no build step.
 
-1. **Boulevard Chase** — neon boulevard, the getaway (hero panel)
-2. **Boardwalk Lights** — ferris wheel over the pier
-3. **Heist Standoff** — heist vs police, the standoff
-4. **Night Skate** — skateboard under neon
+- **Snapshots (left):** four photo slots. Each snapshot fills its own panel:
+  1 fills panel 1, 2 fills panel 2, 3 fills panel 3, 4 fills panel 4. Upload
+  your own photo per slot, tilt it (-1.5°, 0°, +1.5°), zoom it with the
+  slider, or reset its crop.
+- **Cover preview (right):** pick a size — Landscape 1920 × 1080, Portrait
+  1080 × 1350, or Square 1080 × 1080 — and edit the cover title. Drag
+  inside a photo to pan its crop, scroll over a photo to zoom it, drag a
+  panel by its bottom edge to swap panels.
+- **Export:** "Export PNG (this size)" saves the active size;
+  "Export all 3 sizes" saves all three, one after another.
 
-Each orientation gets its own layout, tuned so the printed titles on the source
-posters stay out of frame while the action stays centred:
+## Layouts
 
-- **Landscape 1920 x 1080** — hero-dominant: the hero fills the left 1152 px,
-  the other three panels stack on the right.
-- **Portrait 1080 x 1350** — hero on top (1080 x 810), three panels below.
-- **Square 1080 x 1080** — banner: the hero spans the top 55%, three panels
-  below.
-- **Diagonal landscape** — a separate render (`?layout=diagonal`): four
-  slanted full-height strips, 480 px wide, slant 60.
+Every layout is full-bleed: panels cover the whole cover edge to edge, with
+no margins, gutters, or borders. The only text on the cover is the title,
+set in Anton over a dark scrim.
 
-The only text drawn on the cover is the title itself, set in Anton over a dark
-scrim. No panel names, no logos, no official artwork.
+- **Landscape:** hero-dominant — one large hero panel on the left, three
+  stacked panels on the right.
+- **Portrait:** hero on top, three panels in a row below.
+- **Square:** wide hero banner on top, three panels in a row below.
+- **Diagonal landscape:** a separate render (`?layout=diagonal`) — four
+  slanted full-height strips. The editor always exports the standard
+  layouts.
 
-## Use it
+## Verification
 
-Open `app/index.html` in a browser. No server and no network needed — every
-asset (photos, fonts) is local.
-
-- Pick a size: Landscape, Portrait, or Square.
-- **Export PNG (this size)** downloads the current size; **Export all 3 sizes**
-  downloads all three.
-- Each Snapshot card fills its own panel. Upload a photo to replace one, drag
-  inside the photo to pan its crop, scroll over it to zoom, use the tilt
-  buttons to rotate it, or hit **Reset crop**.
-- Drag a panel by its bottom edge onto another panel to swap the two panels.
-- Edit the **Cover title** field to change the title (uppercased automatically).
-
-Query parameters:
-
-- `?size=portrait` (or `landscape` / `square`) — start on that size.
-- `?layout=diagonal` — render the diagonal landscape layout.
-- `?scene=cover` — hide the editor and show only the cover.
-
-## Verify
-
-Run the deterministic bundle verifier from the repo root:
+Run the deterministic verifier from the repo root:
 
 ```sh
 node main.ts
 ```
 
-It runs 32 checks (all files present, offline, licence, README badges, owner
-wallet, distinct samples, font licences, Anton-only fonts, and the four layout
-snippets) and exits 0 when all 32 pass.
+It runs 32 checks (files exist, offline, license, badges, owner wallet,
+distinct samples, font licenses, Anton-only fonts, layout snippets) and
+prints a sorted JSON report. Exit 0 means 32/32 passed.
 
-## Fonts and licence
+## Fonts
 
-Display font Anton under the SIL Open Font License 1.1 — see `app/fonts/`.
+Display font Anton under the SIL Open Font License 1.1 (see `app/fonts/`).
 Original lettering and art direction. No official logos or artwork.
