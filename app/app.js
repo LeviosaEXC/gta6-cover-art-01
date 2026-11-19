@@ -10,10 +10,15 @@ const SIZES = {
 };
 
 const SAMPLES = [
-  { file: "samples/sample1-hero.jpg", label: "Boulevard Chase", cap: "Neon boulevard - the getaway" },
-  { file: "samples/sample2-ferris.jpg", label: "Boardwalk Lights", cap: "Ferris wheel over the pier" },
-  { file: "samples/sample3-heist.jpg", label: "Heist Standoff", cap: "Heist vs police - the standoff" },
-  { file: "samples/sample4-skate.jpg", label: "Night Skate", cap: "Skateboard under neon" },
+  // fy is the focal height (fraction of the image) the crop window
+  // centres on. Three samples are portrait posters with big baked-in
+  // title text at the top and a tagline at the bottom; the focal point
+  // keeps the action band centred and those baked texts out of frame.
+  // (fx stays centred for all four.)
+  { file: "samples/sample1-hero.jpg", label: "Boulevard Chase", cap: "Neon boulevard - the getaway", fy: 0.58 },
+  { file: "samples/sample2-ferris.jpg", label: "Boardwalk Lights", cap: "Ferris wheel over the pier", fy: 0.48 },
+  { file: "samples/sample3-heist.jpg", label: "Heist Standoff", cap: "Heist vs police - the standoff", fy: 0.62 },
+  { file: "samples/sample4-skate.jpg", label: "Night Skate", cap: "Skateboard under neon", fy: 0.48 },
 ];
 
 // One layout per aspect. No shared card positions: each size gets its
@@ -22,46 +27,49 @@ const SAMPLES = [
 function layoutFor(sizeKey) {
   if (sizeKey === "portrait") {
     return {
-      margin: 40, gap: 16,
-      title: { x: 40, y: 104, size: 76 },
-      sun: { x: 962, y: 68, r: 46 },
-      tagline: { x: 40, y: 148, size: 34 },
+      // Gap 0: the four panels tile edge-to-edge with no gutter, no
+      // border and square corners, so the grid reads as one continuous
+      // image instead of four separate boxes.
+      margin: 20, gap: 0,
+      title: { x: 20, y: 100, size: 76 },
+      sun: { x: 1014, y: 66, r: 44 },
+      tagline: { x: 20, y: 144, size: 34 },
       rects: [
-        { x: 40, y: 178, w: 1000, h: 500 },
-        { x: 40, y: 694, w: 492, h: 250 },
-        { x: 548, y: 694, w: 492, h: 250 },
-        { x: 40, y: 960, w: 1000, h: 252 },
+        { x: 20, y: 174, w: 1040, h: 520 },
+        { x: 20, y: 694, w: 520, h: 252 },
+        { x: 540, y: 694, w: 520, h: 252 },
+        { x: 20, y: 946, w: 1040, h: 246 },
       ],
-      strip: 40, labelSize: 24, caption: { y: 1252, size: 38 },
+      strip: 40, labelSize: 24, caption: { y: 1256, size: 38 },
     };
   }
   if (sizeKey === "square") {
     return {
-      margin: 40, gap: 16,
-      title: { x: 40, y: 98, size: 72 },
-      sun: { x: 964, y: 66, r: 42 },
-      tagline: { x: 40, y: 142, size: 32 },
+      margin: 20, gap: 0,
+      title: { x: 20, y: 94, size: 72 },
+      sun: { x: 1016, y: 64, r: 42 },
+      tagline: { x: 20, y: 138, size: 32 },
       rects: [
-        { x: 40, y: 172, w: 1000, h: 390 },
-        { x: 40, y: 578, w: 492, h: 186 },
-        { x: 548, y: 578, w: 492, h: 186 },
-        { x: 40, y: 780, w: 1000, h: 182 },
+        { x: 20, y: 168, w: 1040, h: 400 },
+        { x: 20, y: 568, w: 520, h: 190 },
+        { x: 540, y: 568, w: 520, h: 190 },
+        { x: 20, y: 758, w: 1040, h: 182 },
       ],
-      strip: 38, labelSize: 23, caption: { y: 1006, size: 36 },
+      strip: 38, labelSize: 23, caption: { y: 1012, size: 36 },
     };
   }
   return {
-    margin: 48, gap: 20,
-    title: { x: 48, y: 132, size: 108 },
-    sun: { x: 1745, y: 92, r: 66 },
-    tagline: { x: 48, y: 182, size: 42 },
+    margin: 24, gap: 0,
+    title: { x: 24, y: 128, size: 108 },
+    sun: { x: 1830, y: 88, r: 64 },
+    tagline: { x: 24, y: 178, size: 42 },
     rects: [
-      { x: 48, y: 212, w: 1096, h: 478 },
-      { x: 1164, y: 212, w: 708, h: 478 },
-      { x: 48, y: 710, w: 876, h: 292 },
-      { x: 944, y: 710, w: 928, h: 292 },
+      { x: 24, y: 208, w: 1120, h: 486 },
+      { x: 1144, y: 208, w: 752, h: 486 },
+      { x: 24, y: 694, w: 912, h: 294 },
+      { x: 936, y: 694, w: 960, h: 294 },
     ],
-    strip: 46, labelSize: 28, caption: { y: 1040, size: 42 },
+    strip: 46, labelSize: 28, caption: { y: 1042, size: 42 },
   };
 }
 
@@ -73,6 +81,7 @@ const state = {
   panels: SAMPLES.map((s) => ({
     label: s.label, cap: s.cap, file: s.file,
     img: null, loaded: false,
+    fx: 0.5, fy: s.fy,
     zoom: 1, ox: 0, oy: 0, tilt: 0,
   })),
 };
@@ -110,16 +119,29 @@ async function ensureFonts() {
   }
 }
 
-function clampCrop(p, rect) {
-  if (!p.img) return;
+// Focal offset for a panel: how far the crop window recentres from the
+// image middle, in screen px, so the focal point (fx, fy) lands in the
+// middle of the frame. mx/my are the hard limits the total offset may
+// reach before the image stops covering the frame.
+function focalOffset(p, rect) {
+  if (!p.img) return { fox: 0, foy: 0, mx: 0, my: 0 };
   const base = Math.max(rect.w / p.img.naturalWidth, rect.h / p.img.naturalHeight);
   const dw = p.img.naturalWidth * base * p.zoom;
   const dh = p.img.naturalHeight * base * p.zoom;
   const mx = Math.max(0, (dw - rect.w) / 2);
   const my = Math.max(0, (dh - rect.h) / 2);
-  p.ox = Math.max(-mx, Math.min(mx, p.ox));
-  p.oy = Math.max(-my, Math.min(my, p.oy));
-  if (p.zoom <= 1) { p.ox = 0; p.oy = 0; }
+  const fox = Math.max(-mx, Math.min(mx, dw * (0.5 - p.fx)));
+  const foy = Math.max(-my, Math.min(my, dh * (0.5 - p.fy)));
+  return { fox, foy, mx, my };
+}
+
+function clampCrop(p, rect) {
+  const f = focalOffset(p, rect);
+  if (p.zoom <= 1) { p.ox = 0; p.oy = 0; return; }
+  // User pan (ox/oy) rides on top of the focal offset; the sum must stay
+  // inside the cover limits.
+  p.ox = Math.max(-(f.mx - Math.abs(f.fox)), Math.min(f.mx - Math.abs(f.fox), p.ox));
+  p.oy = Math.max(-(f.my - Math.abs(f.foy)), Math.min(f.my - Math.abs(f.foy), p.oy));
 }
 
 function roundRectPath(ctx, x, y, w, h, r) {
@@ -134,18 +156,24 @@ function roundRectPath(ctx, x, y, w, h, r) {
 
 function drawPanel(ctx, p, rect, strip, labelSize) {
   ctx.save();
-  roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 14);
+  // Square corners, no frame stroke: with gap 0 the panels tile
+  // edge-to-edge and the grid reads as one continuous image.
+  roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 0);
   ctx.clip();
   if (p.img && p.loaded) {
     clampCrop(p, rect);
     const base = Math.max(rect.w / p.img.naturalWidth, rect.h / p.img.naturalHeight);
-    const dw = p.img.naturalWidth * base * p.zoom;
-    const dh = p.img.naturalHeight * base * p.zoom;
+    // A tilted panel is drawn slightly oversized so its rotated corners
+    // still cover the frame and no background wedge shows at the seam.
+    const over = p.tilt === 0 ? 1 : 1.02;
+    const dw = p.img.naturalWidth * base * p.zoom * over;
+    const dh = p.img.naturalHeight * base * p.zoom * over;
+    const f = focalOffset(p, rect);
     const cx = rect.x + rect.w / 2;
     const cy = rect.y + rect.h / 2;
     ctx.translate(cx, cy);
     ctx.rotate((p.tilt * Math.PI) / 180);
-    ctx.drawImage(p.img, -dw / 2 + p.ox, -dh / 2 + p.oy, dw, dh);
+    ctx.drawImage(p.img, -dw / 2 + f.fox + p.ox, -dh / 2 + f.foy + p.oy, dw, dh);
     ctx.rotate((-p.tilt * Math.PI) / 180);
     ctx.translate(-cx, -cy);
   } else {
@@ -160,13 +188,6 @@ function drawPanel(ctx, p, rect, strip, labelSize) {
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.fillText(p.label, rect.x + 16, rect.y + rect.h - strip / 2 + 1, rect.w - 32);
-  ctx.restore();
-  // Frame.
-  ctx.save();
-  roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 14);
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
-  ctx.lineWidth = 4;
-  ctx.stroke();
   ctx.restore();
 }
 
@@ -297,6 +318,7 @@ function buildSlots() {
           p.img = im;
           p.loaded = true;
           p.zoom = 1; p.ox = 0; p.oy = 0;
+          p.fx = 0.5; p.fy = 0.5;
           img.src = reader.result;
           renderPreview();
         });
