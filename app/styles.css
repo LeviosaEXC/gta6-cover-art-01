@@ -33,7 +33,7 @@
 
 body {
   margin: 0;
-  background: linear-gradient(180deg, var(--bg) 0%, #1a0b33 60%, #200b2e 100%);
+  background: linear-gradient(var(--bg) 0%, #1a0b33 60%, #200b2e 100%);
   color: var(--ink);
   font-family: "Trebuchet MS", "Segoe UI", Arial, sans-serif;
 }
@@ -123,12 +123,6 @@ body {
   margin: 8px 0;
   background: #000000;
   display: block;
-}
-
-.slot-cap {
-  color: var(--muted);
-  font-size: 12px;
-  margin: 0 0 8px;
 }
 
 .slot input[type="file"] {
@@ -264,11 +258,11 @@ body.scene-cover {
 
 body.scene-cover .topbar,
 body.scene-cover .panel-col,
-body.scene-cover .stage-col h2,
 body.scene-cover .stage-toolbar,
 body.scene-cover .stage-note,
 body.scene-cover .text-col,
-body.scene-cover .foot {
+body.scene-cover .foot,
+body.scene-cover .stage-col > h2 {
   display: none;
 }
 
